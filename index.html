@@ -1,15 +1,15 @@
 <!DOCTYPE html>
-<html lang="it">
+<html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Gestione Prenotazioni Strumenti Laboratorio</title>
+  <title>Laboratory Instrument Booking System</title>
   
   <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
   <!-- Lucide Icons -->
   <script src="https://unpkg.com/lucide@latest"></script>
-  <!-- Chart.js per Grafici -->
+  <!-- Chart.js -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <!-- Firebase JS SDK (v9 compat) -->
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
@@ -17,7 +17,7 @@
 </head>
 <body class="bg-slate-50 text-slate-800 font-sans min-h-screen flex flex-col">
 
-  <!-- BANNER NOTIFICA CONFLITTI E AVVISI (In sovrimpressione z-[100]) -->
+  <!-- CONFLICT AND NOTIFICATION ALERT BANNER (z-[100] Overlay) -->
   <div id="alertBanner" class="hidden fixed top-5 left-1/2 -translate-x-1/2 z-[100] w-11/12 max-w-xl p-4 rounded-xl shadow-2xl transition-all duration-300 flex items-start gap-3 border">
     <i id="alertIcon" data-lucide="alert-triangle" class="w-6 h-6 flex-shrink-0 mt-0.5"></i>
     <div class="flex-1">
@@ -37,8 +37,8 @@
           <i data-lucide="flask-conical" class="w-6 h-6 text-white"></i>
         </div>
         <div>
-          <h1 class="font-bold text-lg leading-tight">Prenotazione Strumenti</h1>
-          <p class="text-xs text-slate-400">Laboratorio di Spettroscopia</p>
+          <h1 class="font-bold text-lg leading-tight">Instrument Booking</h1>
+          <p class="text-xs text-slate-400">Spectroscopy Laboratory</p>
         </div>
       </div>
 
@@ -46,18 +46,18 @@
       <div class="flex items-center gap-3">
         <div id="cloudStatusBadge" class="hidden sm:flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-emerald-950 text-emerald-400 border border-emerald-800">
           <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-          <span>Cloud Attivo</span>
+          <span>Cloud Sync Active</span>
         </div>
 
         <div id="userInfoHeader" class="hidden items-center gap-3">
           <div class="text-right">
             <span id="userEmailDisplay" class="text-sm font-medium block text-slate-200"></span>
-            <span id="userRoleBadge" class="text-[10px] uppercase font-bold text-blue-400 bg-blue-950/60 px-2 py-0.5 rounded border border-blue-800">Utente</span>
+            <span id="userRoleBadge" class="text-[10px] uppercase font-bold text-blue-400 bg-blue-950/60 px-2 py-0.5 rounded border border-blue-800">User</span>
           </div>
           <button id="adminPanelBtn" onclick="openAdminModal()" class="hidden bg-slate-800 hover:bg-slate-700 text-amber-400 px-3 py-1.5 rounded-lg text-xs font-medium border border-amber-500/30 transition flex items-center gap-1.5">
-            <i data-lucide="shield-check" class="w-4 h-4"></i> Gestisci Utenti
+            <i data-lucide="shield-check" class="w-4 h-4"></i> Manage Users
           </button>
-          <button onclick="logout()" class="bg-red-600/20 hover:bg-red-600/40 text-red-300 p-2 rounded-lg border border-red-500/30 transition" title="Disconnetti">
+          <button onclick="logout()" class="bg-red-600/20 hover:bg-red-600/40 text-red-300 p-2 rounded-lg border border-red-500/30 transition" title="Sign Out">
             <i data-lucide="log-out" class="w-4 h-4"></i>
           </button>
         </div>
@@ -65,161 +65,154 @@
     </div>
   </header>
 
-  <!-- CONTENUTO PRINCIPALE -->
+  <!-- MAIN CONTENT -->
   <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
 
-    <!-- SCHERMATA LOGIN / REGISTRAZIONE -->
+    <!-- LOGIN / REGISTRATION SECTION -->
     <div id="authSection" class="max-w-md mx-auto my-12 bg-white rounded-2xl shadow-xl border border-slate-200 overflow-hidden">
       <div class="bg-slate-900 p-6 text-center text-white">
         <i data-lucide="lock" class="w-10 h-10 mx-auto text-blue-400 mb-2"></i>
-        <h2 class="text-xl font-bold">Accesso Laboratorio</h2>
-        <p class="text-xs text-slate-400 mt-1">Inserisci le tue credenziali autorizzate per accedere</p>
+        <h2 class="text-xl font-bold">Laboratory Access</h2>
+        <p class="text-xs text-slate-400 mt-1">Sign in with your email or complete first registration</p>
       </div>
 
       <div class="p-6">
         <div class="flex border-b border-slate-200 mb-6">
-          <button id="tabLogin" onclick="switchAuthTab('login')" class="flex-1 py-2 text-center font-semibold text-blue-600 border-b-2 border-blue-600">Accedi</button>
-          <button id="tabRegister" onclick="switchAuthTab('register')" class="flex-1 py-2 text-center font-semibold text-slate-400 border-b-2 border-transparent">Prima Registrazione</button>
+          <button id="tabLogin" onclick="switchAuthTab('login')" class="flex-1 py-2 text-center font-semibold text-blue-600 border-b-2 border-blue-600">Sign In</button>
+          <button id="tabRegister" onclick="switchAuthTab('register')" class="flex-1 py-2 text-center font-semibold text-slate-400 border-b-2 border-transparent">First Registration</button>
         </div>
 
-        <!-- Form Login -->
+        <!-- Login Form -->
         <form id="loginForm" onsubmit="handleLogin(event)" class="space-y-4">
           <div>
-            <label class="block text-xs font-semibold text-slate-600 mb-1">Email Istituzionale</label>
-            <input type="email" id="loginEmail" required placeholder="matteo.cei@phd.unipi.it" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm">
+            <label class="block text-xs font-semibold text-slate-600 mb-1">Institutional Email</label>
+            <input type="email" id="loginEmail" required placeholder="first.last@phd.unipi.it" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm">
           </div>
           <div>
             <label class="block text-xs font-semibold text-slate-600 mb-1">Password</label>
             <input type="password" id="loginPassword" required placeholder="••••••••" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm">
           </div>
-          <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2.5 rounded-lg transition shadow-md text-sm">Entra nel Sistema</button>
+          <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2.5 rounded-lg transition shadow-md text-sm">Sign In</button>
         </form>
 
-        <!-- Form Prima Registrazione -->
+        <!-- First Registration Form -->
         <form id="registerForm" onsubmit="handleRegister(event)" class="space-y-4 hidden">
           <div>
-            <label class="block text-xs font-semibold text-slate-600 mb-1">Email Autorizzata</label>
-            <input type="email" id="regEmail" required placeholder="nome.cognome@phd.unipi.it" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm">
-            <span class="text-[11px] text-slate-400">L'email deve essere stata approvata dall'Amministratore</span>
+            <label class="block text-xs font-semibold text-slate-600 mb-1">Institutional Email</label>
+            <input type="email" id="regEmail" required placeholder="first.last@phd.unipi.it" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm">
+            <span class="text-[11px] text-slate-400">Enter your university email (@unipi.it, @phd.unipi.it)</span>
           </div>
           <div>
-            <label class="block text-xs font-semibold text-slate-600 mb-1">Scegli una Password</label>
-            <input type="password" id="regPassword" required minlength="4" placeholder="Scegli la tua password" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm">
+            <label class="block text-xs font-semibold text-slate-600 mb-1">Choose a Password</label>
+            <input type="password" id="regPassword" required minlength="4" placeholder="Choose your password" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm">
           </div>
-          <button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-2.5 rounded-lg transition shadow-md text-sm">Salva Password e Accedi</button>
+          <button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-2.5 rounded-lg transition shadow-md text-sm">Register Password & Sign In</button>
         </form>
-
-        <!-- Pulsante sblocco/reset in caso di problemi di memoria browser -->
-        <div class="mt-6 pt-4 border-t border-slate-100 text-center">
-          <button onclick="resetSystemData()" class="text-[11px] text-slate-400 hover:text-red-500 underline">
-            Problemi di accesso? Clicca qui per resettare la memoria locale
-          </button>
-        </div>
       </div>
     </div>
 
-    <!-- DASHBOARD APPLICAZIONE -->
+    <!-- APPLICATION DASHBOARD -->
     <div id="appDashboard" class="hidden space-y-6">
 
-      <!-- MENU DI NAVIGAZIONE INTERNO -->
+      <!-- NAVIGATION MENU -->
       <div class="flex items-center gap-3 border-b border-slate-200 pb-3">
         <button id="navBtnBooking" onclick="switchView('booking')" class="px-4 py-2 rounded-xl text-sm font-bold bg-blue-600 text-white shadow-sm flex items-center gap-2 transition">
-          <i data-lucide="calendar" class="w-4 h-4"></i> Calendario & Prenotazioni
+          <i data-lucide="calendar" class="w-4 h-4"></i> Calendar & Bookings
         </button>
         <button id="navBtnStats" onclick="switchView('stats')" class="px-4 py-2 rounded-xl text-sm font-bold bg-white text-slate-600 hover:bg-slate-100 border border-slate-200 flex items-center gap-2 transition">
-          <i data-lucide="bar-chart-3" class="w-4 h-4"></i> Statistiche & Analytics
+          <i data-lucide="bar-chart-3" class="w-4 h-4"></i> Statistics & Analytics
         </button>
       </div>
 
-      <!-- VISTA 1: CALENDARIO & PRENOTAZIONI -->
+      <!-- VIEW 1: CALENDAR & BOOKINGS -->
       <div id="viewBooking" class="space-y-8">
-        <!-- I TRE STRUMENTI -->
+        <!-- INSTRUMENTS CARDS -->
         <section>
           <div class="flex items-center justify-between mb-4">
             <h2 class="text-xl font-bold text-slate-800 flex items-center gap-2">
-              <i data-lucide="cpu" class="w-5 h-5 text-blue-600"></i> Seleziona uno Strumento
+              <i data-lucide="cpu" class="w-5 h-5 text-blue-600"></i> Select an Instrument
             </h2>
-            <span class="text-xs text-slate-500">Stato in tempo reale</span>
+            <span class="text-xs text-slate-500">Real-time status</span>
           </div>
 
           <div class="grid grid-cols-1 md:grid-cols-3 gap-6" id="instrumentCardsContainer">
-            <!-- Card degli strumenti caricate via JS -->
+            <!-- Populated via JS -->
           </div>
         </section>
 
-        <!-- CALENDARIO E TIMELINE -->
+        <!-- CALENDAR & TIMELINE -->
         <section class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 space-y-6">
           <div class="flex flex-wrap items-center justify-between gap-4 pb-4 border-b border-slate-100">
             <div>
               <h3 id="currentInstrumentTitle" class="text-lg font-bold text-slate-900">CD Jasco-J1500</h3>
-              <p class="text-xs text-slate-500">Occupazione oraria del giorno selezionato</p>
+              <p class="text-xs text-slate-500">Hourly occupancy for the selected date</p>
             </div>
 
             <div class="flex items-center gap-3">
               <div>
-                <label class="text-xs font-medium text-slate-600 mr-2">Data:</label>
+                <label class="text-xs font-medium text-slate-600 mr-2">Date:</label>
                 <input type="date" id="selectedDate" onchange="renderTimeline()" class="px-3 py-1.5 border rounded-lg text-sm font-medium text-slate-700 outline-none focus:ring-2 focus:ring-blue-500">
               </div>
               <button onclick="openBookingModal()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-semibold flex items-center gap-2 shadow-sm transition">
-                <i data-lucide="plus-circle" class="w-4 h-4"></i> Nuova Prenotazione
+                <i data-lucide="plus-circle" class="w-4 h-4"></i> New Booking
               </button>
             </div>
           </div>
 
           <div>
             <div class="flex items-center justify-between mb-3">
-              <span class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Fasce Orarie (08:00 - 20:00)</span>
+              <span class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Time Slots (08:00 - 20:00)</span>
               <div class="flex items-center gap-4 text-xs font-medium">
-                <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-full bg-emerald-500 inline-block"></span> Libero</span>
-                <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-full bg-amber-500 inline-block"></span> Occupato</span>
+                <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-full bg-emerald-500 inline-block"></span> Available</span>
+                <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-full bg-amber-500 inline-block"></span> Booked</span>
               </div>
             </div>
 
             <div id="timelineSlots" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
-              <!-- Slot popolati via JS -->
+              <!-- Slots populated via JS -->
             </div>
           </div>
         </section>
 
-        <!-- REGISTRO PRENOTAZIONI -->
+        <!-- BOOKING REGISTER -->
         <section class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
           <div class="flex items-center justify-between mb-4">
             <h3 class="text-base font-bold text-slate-900 flex items-center gap-2">
-              <i data-lucide="list-checks" class="w-5 h-5 text-blue-600"></i> Registro Prenotazioni Attive
+              <i data-lucide="list-checks" class="w-5 h-5 text-blue-600"></i> Active Bookings Register
             </h3>
-            <input type="text" id="searchInput" oninput="renderBookingList()" placeholder="Cerca utente o data..." class="px-3 py-1.5 border rounded-lg text-xs w-52 focus:ring-2 focus:ring-blue-500 outline-none">
+            <input type="text" id="searchInput" oninput="renderBookingList()" placeholder="Search user or date..." class="px-3 py-1.5 border rounded-lg text-xs w-52 focus:ring-2 focus:ring-blue-500 outline-none">
           </div>
 
           <div class="overflow-x-auto">
             <table class="w-full text-left border-collapse text-sm">
               <thead>
                 <tr class="bg-slate-50 text-slate-500 text-xs uppercase font-semibold border-b">
-                  <th class="p-3">Strumento</th>
-                  <th class="p-3">Utente</th>
-                  <th class="p-3">Data</th>
-                  <th class="p-3">Orario</th>
-                  <th class="p-3 text-right">Azione</th>
+                  <th class="p-3">Instrument</th>
+                  <th class="p-3">User</th>
+                  <th class="p-3">Date</th>
+                  <th class="p-3">Time</th>
+                  <th class="p-3 text-right">Action</th>
                 </tr>
               </thead>
               <tbody id="bookingsTableBody" class="divide-y divide-slate-100">
-                <!-- Righe tabella -->
+                <!-- Table rows -->
               </tbody>
             </table>
           </div>
         </section>
       </div>
 
-      <!-- VISTA 2: STATISTICHE & ANALYTICS -->
+      <!-- VIEW 2: STATISTICS & ANALYTICS -->
       <div id="viewStats" class="hidden space-y-8">
         
-        <!-- CARD METRICHE RAPIDE -->
+        <!-- KPI METRICS CARDS -->
         <div class="grid grid-cols-1 sm:grid-cols-3 gap-6">
           <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-4">
             <div class="p-3 bg-blue-100 text-blue-600 rounded-xl">
               <i data-lucide="clock" class="w-6 h-6"></i>
             </div>
             <div>
-              <p class="text-xs text-slate-500 font-medium">Ore Totali Prenotate</p>
+              <p class="text-xs text-slate-500 font-medium">Total Booked Hours</p>
               <h3 id="statTotalHours" class="text-2xl font-bold text-slate-900">0 hrs</h3>
             </div>
           </div>
@@ -229,7 +222,7 @@
               <i data-lucide="award" class="w-6 h-6"></i>
             </div>
             <div>
-              <p class="text-xs text-slate-500 font-medium">Utente Più Attivo</p>
+              <p class="text-xs text-slate-500 font-medium">Most Active User</p>
               <h3 id="statTopUser" class="text-base font-bold text-slate-900 truncate max-w-[180px]">-</h3>
             </div>
           </div>
@@ -239,55 +232,55 @@
               <i data-lucide="zap" class="w-6 h-6"></i>
             </div>
             <div>
-              <p class="text-xs text-slate-500 font-medium">Strumento Più Utilizzato</p>
+              <p class="text-xs text-slate-500 font-medium">Most Used Instrument</p>
               <h3 id="statTopInstrument" class="text-base font-bold text-slate-900">-</h3>
             </div>
           </div>
         </div>
 
-        <!-- TABELLA DETTAGLIATA ORE UTENTE / STRUMENTO -->
+        <!-- DETAILED HOURS BREAKDOWN TABLE -->
         <section class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
           <h3 class="text-base font-bold text-slate-900 mb-4 flex items-center gap-2">
-            <i data-lucide="table" class="w-5 h-5 text-blue-600"></i> Ripartizione Ore di Utilizzo per Utente
+            <i data-lucide="table" class="w-5 h-5 text-blue-600"></i> Usage Hours Breakdown by User
           </h3>
           <div class="overflow-x-auto">
             <table class="w-full text-left border-collapse text-sm">
               <thead>
                 <tr class="bg-slate-50 text-slate-500 text-xs uppercase font-semibold border-b">
-                  <th class="p-3">Utente / Ricercatore</th>
+                  <th class="p-3">User / Researcher</th>
                   <th class="p-3 text-center">CD Jasco-J1500</th>
                   <th class="p-3 text-center">Jasco-CPL300</th>
-                  <th class="p-3 text-center">Fluorimetro</th>
-                  <th class="p-3 text-right font-bold">Totale Ore</th>
+                  <th class="p-3 text-center">Fluorometer</th>
+                  <th class="p-3 text-right font-bold">Total Hours</th>
                 </tr>
               </thead>
               <tbody id="userStatsTableBody" class="divide-y divide-slate-100">
-                <!-- Righe conteggio utenti caricate via JS -->
+                <!-- User stats rows -->
               </tbody>
             </table>
           </div>
         </section>
 
-        <!-- GRAFICI -->
+        <!-- CHARTS -->
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
           
-          <!-- ISTOGRAMMA CARINO (Bar Chart) -->
+          <!-- HISTOGRAM (Bar Chart) -->
           <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col">
             <h3 class="text-base font-bold text-slate-900 mb-1 flex items-center gap-2">
-              <i data-lucide="bar-chart-2" class="w-5 h-5 text-blue-600"></i> Ore Totali per Utente e Strumento
+              <i data-lucide="bar-chart-2" class="w-5 h-5 text-blue-600"></i> Total Hours by User & Instrument
             </h3>
-            <p class="text-xs text-slate-500 mb-4">Istogramma comparativo dell'utilizzo dei macchinari</p>
+            <p class="text-xs text-slate-500 mb-4">Comparative usage histogram of equipment</p>
             <div class="relative flex-1 min-h-[300px]">
               <canvas id="barChartUserInstrument"></canvas>
             </div>
           </div>
 
-          <!-- GRAFICO TEMPORALE ORE / GIORNI -->
+          <!-- TIME-SERIES CHART -->
           <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col">
             <h3 class="text-base font-bold text-slate-900 mb-1 flex items-center gap-2">
-              <i data-lucide="trending-up" class="w-5 h-5 text-blue-600"></i> Utilizzo Giornaliero nel Tempo
+              <i data-lucide="trending-up" class="w-5 h-5 text-blue-600"></i> Daily Usage Over Time
             </h3>
-            <p class="text-xs text-slate-500 mb-4">Ore prenotate per giorno dell'anno (colore dedicato per ogni utente)</p>
+            <p class="text-xs text-slate-500 mb-4">Booked hours per day of the year (dedicated color per user)</p>
             <div class="relative flex-1 min-h-[300px]">
               <canvas id="lineChartTimeline"></canvas>
             </div>
@@ -300,12 +293,12 @@
     </div>
   </main>
 
-  <!-- MODALE MODULO PRENOTAZIONE -->
+  <!-- BOOKING MODAL -->
   <div id="bookingModal" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
     <div class="bg-white rounded-2xl shadow-2xl max-w-md w-full overflow-hidden border border-slate-100">
       <div class="bg-slate-900 p-4 text-white flex justify-between items-center">
         <h3 class="font-bold text-base flex items-center gap-2">
-          <i data-lucide="calendar-plus" class="w-5 h-5 text-blue-400"></i> Prenota Strumento
+          <i data-lucide="calendar-plus" class="w-5 h-5 text-blue-400"></i> Book Instrument
         </h3>
         <button onclick="closeBookingModal()" class="text-slate-400 hover:text-white">
           <i data-lucide="x" class="w-5 h-5"></i>
@@ -314,49 +307,49 @@
 
       <form id="bookingForm" onsubmit="saveBooking(event)" class="p-6 space-y-4">
         <div>
-          <label class="block text-xs font-semibold text-slate-700 mb-1">Strumento</label>
+          <label class="block text-xs font-semibold text-slate-700 mb-1">Instrument</label>
           <select id="modalInstrument" class="w-full px-3 py-2 border rounded-lg text-sm bg-white focus:ring-2 focus:ring-blue-500 outline-none">
             <option value="CD Jasco-J1500">CD Jasco-J1500</option>
             <option value="Jasco-CPL300">Jasco-CPL300</option>
-            <option value="Fluorimetro">Fluorimetro</option>
+            <option value="Fluorometer">Fluorometer</option>
           </select>
         </div>
 
         <div>
-          <label class="block text-xs font-semibold text-slate-700 mb-1">Nome Utente</label>
+          <label class="block text-xs font-semibold text-slate-700 mb-1">Username / Email</label>
           <input type="text" id="modalUser" readonly class="w-full px-3 py-2 border rounded-lg text-sm bg-slate-100 text-slate-600 font-medium outline-none cursor-not-allowed">
         </div>
 
         <div>
-          <label class="block text-xs font-semibold text-slate-700 mb-1">Data Prenotazione</label>
+          <label class="block text-xs font-semibold text-slate-700 mb-1">Booking Date</label>
           <input type="date" id="modalDate" required class="w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none">
         </div>
 
         <div class="grid grid-cols-2 gap-4">
           <div>
-            <label class="block text-xs font-semibold text-slate-700 mb-1">Ora Inizio</label>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">Start Time</label>
             <input type="time" id="modalStartTime" required step="1800" class="w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none">
           </div>
           <div>
-            <label class="block text-xs font-semibold text-slate-700 mb-1">Ora Fine</label>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">End Time</label>
             <input type="time" id="modalEndTime" required step="1800" class="w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none">
           </div>
         </div>
 
         <div class="pt-4 flex items-center justify-end gap-3 border-t border-slate-100">
-          <button type="button" onclick="closeBookingModal()" class="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-lg">Annulla</button>
-          <button type="submit" class="px-5 py-2 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-sm">Conferma Prenotazione</button>
+          <button type="button" onclick="closeBookingModal()" class="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-lg">Cancel</button>
+          <button type="submit" class="px-5 py-2 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-sm">Confirm Booking</button>
         </div>
       </form>
     </div>
   </div>
 
-  <!-- MODALE PANNELLO ADMIN -->
+  <!-- ADMIN MODAL -->
   <div id="adminModal" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
     <div class="bg-white rounded-2xl shadow-2xl max-w-lg w-full overflow-hidden border border-slate-100">
       <div class="bg-slate-900 p-4 text-white flex justify-between items-center">
         <h3 class="font-bold text-base flex items-center gap-2">
-          <i data-lucide="shield" class="w-5 h-5 text-amber-400"></i> Gestione Utenti Autorizzati (Admin)
+          <i data-lucide="shield" class="w-5 h-5 text-amber-400"></i> Authorized Users Management (Admin)
         </h3>
         <button onclick="closeAdminModal()" class="text-slate-400 hover:text-white">
           <i data-lucide="x" class="w-5 h-5"></i>
@@ -365,50 +358,39 @@
 
       <div class="p-6 space-y-6">
         <form onsubmit="addAuthorizedEmail(event)" class="flex gap-2">
-          <input type="email" id="newAuthEmail" required placeholder="nuovo.ricercatore@phd.unipi.it" class="flex-1 px-3 py-2 border rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500">
-          <button type="submit" class="bg-emerald-600 hover:bg-emerald-700 text-white font-medium px-4 py-2 rounded-lg text-sm transition">Autorizza Email</button>
+          <input type="email" id="newAuthEmail" required placeholder="new.researcher@phd.unipi.it" class="flex-1 px-3 py-2 border rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500">
+          <button type="submit" class="bg-emerald-600 hover:bg-emerald-700 text-white font-medium px-4 py-2 rounded-lg text-sm transition">Authorize Email</button>
         </form>
 
         <div>
-          <h4 class="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Lista Email Abilitate</h4>
+          <h4 class="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Authorized Email List</h4>
           <div class="max-h-56 overflow-y-auto border border-slate-100 rounded-xl divide-y" id="authorizedListContainer">
-            <!-- Popolato via JS -->
+            <!-- Populated via JS -->
           </div>
         </div>
       </div>
     </div>
   </div>
 
-  <!-- JAVASCRIPT LOGIC SICURO ED AUTOGUARINTE -->
+  <!-- JAVASCRIPT APP LOGIC -->
   <script>
-    // -------------------------------------------------------------
-    // HELPERS SICURI
-    // -------------------------------------------------------------
     function getStorageItem(key, fallback) {
       try {
         const val = localStorage.getItem(key);
         return val ? JSON.parse(val) : fallback;
       } catch (e) {
-        console.warn("Errore lettura localStorage:", key, e);
         return fallback;
       }
     }
 
     function safeCreateIcons() {
       if (typeof lucide !== 'undefined' && lucide && typeof lucide.createIcons === 'function') {
-        try { lucide.createIcons(); } catch(e) { console.warn("Lucide Error:", e); }
-      }
-    }
-
-    function resetSystemData() {
-      if (confirm("Vuoi resettare i dati salvati in locale per ripristinare il corretto funzionamento?")) {
-        localStorage.clear();
-        location.reload();
+        try { lucide.createIcons(); } catch(e) {}
       }
     }
 
     // -------------------------------------------------------------
-    // CONFIGURAZIONE FIREBASE FIRESTORE
+    // FIREBASE FIRESTORE CONFIGURATION
     // -------------------------------------------------------------
     const firebaseConfig = {
       apiKey: "PASTE_YOUR_API_KEY_HERE",
@@ -429,15 +411,13 @@
         isCloudEnabled = true;
         document.getElementById('cloudStatusBadge').classList.remove('hidden');
       }
-    } catch(e) {
-      console.log("Firebase non configurato. Uso modalità locale.");
-    }
+    } catch(e) {}
 
     // -------------------------------------------------------------
-    // COSTANTI E STATO
+    // CONSTANTS & STATE
     // -------------------------------------------------------------
     const ADMIN_EMAIL = "matteo.cei@phd.unipi.it";
-    const INSTRUMENTS = ["CD Jasco-J1500", "Jasco-CPL300", "Fluorimetro"];
+    const INSTRUMENTS = ["CD Jasco-J1500", "Jasco-CPL300", "Fluorometer"];
     const USER_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#14b8a6'];
 
     let currentView = 'booking';
@@ -448,7 +428,6 @@
     let barChartInstance = null;
     let lineChartInstance = null;
 
-    // INIZIALIZZAZIONE SICURA ADMIN E PASSWORD
     let authorizedUsers = getStorageItem('lab_authorized_users', []);
     if (!Array.isArray(authorizedUsers)) authorizedUsers = [];
     if (!authorizedUsers.some(u => u && u.email && u.email.toLowerCase() === ADMIN_EMAIL.toLowerCase())) {
@@ -463,9 +442,6 @@
       localStorage.setItem('lab_registered_passes', JSON.stringify(registeredPasses));
     }
 
-    // -------------------------------------------------------------
-    // SINCRONIZZAZIONE
-    // -------------------------------------------------------------
     function initDataSync() {
       if (isCloudEnabled && db) {
         db.collection("bookings").onSnapshot((snapshot) => {
@@ -473,14 +449,14 @@
           snapshot.forEach((doc) => bookings.push({ id: doc.id, ...doc.data() }));
           localStorage.setItem('lab_bookings', JSON.stringify(bookings));
           refreshUI();
-        }, err => console.warn("Sync err:", err));
+        }, err => {});
 
         db.collection("authorizedUsers").onSnapshot((snapshot) => {
           authorizedUsers = [];
           snapshot.forEach((doc) => authorizedUsers.push(doc.data()));
           localStorage.setItem('lab_authorized_users', JSON.stringify(authorizedUsers));
           renderAuthorizedUsersList();
-        }, err => console.warn("Sync err:", err));
+        }, err => {});
       } else {
         refreshUI();
       }
@@ -503,9 +479,7 @@
         if (currentView === 'stats') {
           renderStats();
         }
-      } catch (err) {
-        console.error("Errore durante l'aggiornamento UI:", err);
-      }
+      } catch (err) {}
     }
 
     function switchView(view) {
@@ -530,7 +504,7 @@
     }
 
     // -------------------------------------------------------------
-    // AUTENTICAZIONE
+    // AUTHENTICATION & REGISTRATION
     // -------------------------------------------------------------
     function checkAuthStatus() {
       try {
@@ -552,7 +526,7 @@
             document.getElementById('userRoleBadge').textContent = "Admin";
           } else {
             adminPanelBtn.classList.add('hidden');
-            document.getElementById('userRoleBadge').textContent = "Utente";
+            document.getElementById('userRoleBadge').textContent = "User";
           }
 
           refreshUI();
@@ -561,9 +535,7 @@
           appDashboard.classList.add('hidden');
           userInfoHeader.classList.add('hidden');
         }
-      } catch (e) {
-        console.error("Errore checkAuthStatus:", e);
-      }
+      } catch (e) {}
     }
 
     function switchAuthTab(tab) {
@@ -587,55 +559,71 @@
 
     function handleLogin(e) {
       e.preventDefault();
-      try {
-        const email = document.getElementById('loginEmail').value.trim().toLowerCase();
-        const pass = document.getElementById('loginPassword').value;
+      const email = document.getElementById('loginEmail').value.trim().toLowerCase();
+      const pass = document.getElementById('loginPassword').value;
 
-        if (registeredPasses[email] && registeredPasses[email] === pass) {
-          currentUser = { email: email };
-          localStorage.setItem('lab_current_user', JSON.stringify(currentUser));
-          checkAuthStatus();
-          showAlert('success', 'Accesso effettuato', `Benvenuto/a ${email}`);
-        } else {
-          showAlert('error', 'Credenziali errate', 'Password errata. Se è la prima volta passa a "Prima Registrazione".');
-        }
-      } catch (err) {
-        console.error("Login err:", err);
-        showAlert('error', 'Errore di Login', 'Impossibile completare il login. Clicca su reset dati in basso se persiste.');
+      if (!email || !pass) {
+        showAlert('error', 'Incomplete Fields', 'Please enter both email and password.');
+        return;
+      }
+
+      if (email === ADMIN_EMAIL.toLowerCase() && !registeredPasses[email]) {
+        registeredPasses[email] = "admin123";
+        localStorage.setItem('lab_registered_passes', JSON.stringify(registeredPasses));
+      }
+
+      const savedPass = registeredPasses[email];
+
+      if (savedPass && savedPass === pass) {
+        currentUser = { email: email };
+        localStorage.setItem('lab_current_user', JSON.stringify(currentUser));
+        checkAuthStatus();
+        showAlert('success', 'Signed In', `Welcome ${email}`);
+      } else if (!savedPass) {
+        showAlert('error', 'User Not Registered', 'This email is not registered yet. Switch to "First Registration".');
+      } else {
+        showAlert('error', 'Incorrect Password', 'The password entered is incorrect.');
       }
     }
 
     function handleRegister(e) {
       e.preventDefault();
-      try {
-        const email = document.getElementById('regEmail').value.trim().toLowerCase();
-        const pass = document.getElementById('regPassword').value;
+      const email = document.getElementById('regEmail').value.trim().toLowerCase();
+      const pass = document.getElementById('regPassword').value;
 
-        const isAuthorized = authorizedUsers.some(u => u && u.email && u.email.toLowerCase() === email);
-
-        if (!isAuthorized) {
-          showAlert('error', 'Non Autorizzato', `L'email ${email} non è tra quelle abilitate dall'Admin.`);
-          return;
-        }
-
-        registeredPasses[email] = pass;
-        localStorage.setItem('lab_registered_passes', JSON.stringify(registeredPasses));
-
-        const userIndex = authorizedUsers.findIndex(u => u && u.email && u.email.toLowerCase() === email);
-        if (userIndex !== -1) {
-          authorizedUsers[userIndex].status = 'Registered';
-        } else {
-          authorizedUsers.push({ email: email, status: 'Registered' });
-        }
-        localStorage.setItem('lab_authorized_users', JSON.stringify(authorizedUsers));
-
-        currentUser = { email: email };
-        localStorage.setItem('lab_current_user', JSON.stringify(currentUser));
-        checkAuthStatus();
-        showAlert('success', 'Registrazione completata', 'Password registrata con successo!');
-      } catch(err) {
-        console.error("Register err:", err);
+      if (!email || !pass) {
+        showAlert('error', 'Incomplete Fields', 'Please enter both email and password.');
+        return;
       }
+
+      const isExplicitlyAuthorized = authorizedUsers.some(u => u && u.email && u.email.toLowerCase() === email);
+      const isInstitutional = email.endsWith('@unipi.it') || email.endsWith('@phd.unipi.it') || email.endsWith('@studenti.unipi.it');
+
+      if (!isExplicitlyAuthorized && !isInstitutional) {
+        showAlert('error', 'Unauthorized', `Email ${email} does not belong to unipi.it domain or is not authorized by Admin.`);
+        return;
+      }
+
+      registeredPasses[email] = pass;
+      localStorage.setItem('lab_registered_passes', JSON.stringify(registeredPasses));
+
+      const userIndex = authorizedUsers.findIndex(u => u && u.email && u.email.toLowerCase() === email);
+      if (userIndex !== -1) {
+        authorizedUsers[userIndex].status = 'Registered';
+      } else {
+        authorizedUsers.push({ email: email, status: 'Registered' });
+      }
+      localStorage.setItem('lab_authorized_users', JSON.stringify(authorizedUsers));
+
+      if (isCloudEnabled && db) {
+        db.collection("authorizedUsers").add({ email: email, status: 'Registered' });
+      }
+
+      currentUser = { email: email };
+      localStorage.setItem('lab_current_user', JSON.stringify(currentUser));
+      
+      checkAuthStatus();
+      showAlert('success', 'Registration Completed!', `Account ${email} registered and signed in.`);
     }
 
     function logout() {
@@ -644,12 +632,9 @@
       checkAuthStatus();
     }
 
-    // -------------------------------------------------------------
-    // AMMINISTRAZIONE
-    // -------------------------------------------------------------
     function openAdminModal() {
       if (!currentUser || currentUser.email.toLowerCase() !== ADMIN_EMAIL.toLowerCase()) {
-        showAlert('error', 'Non Autorizzato', 'Solo l\'amministratore ha l\'accesso.');
+        showAlert('error', 'Unauthorized', 'Only the administrator has access.');
         return;
       }
       renderAuthorizedUsersList();
@@ -689,7 +674,7 @@
       const email = document.getElementById('newAuthEmail').value.trim().toLowerCase();
 
       if (authorizedUsers.some(u => u && u.email && u.email.toLowerCase() === email)) {
-        showAlert('warning', 'Email già presente', 'L\'email è già abilitata.');
+        showAlert('warning', 'Email Already Exists', 'Email is already authorized.');
         return;
       }
 
@@ -703,7 +688,7 @@
 
       document.getElementById('newAuthEmail').value = '';
       renderAuthorizedUsersList();
-      showAlert('success', 'Email Abilitata', `${email} può ora registrarsi.`);
+      showAlert('success', 'Email Authorized', `${email} can now register.`);
     }
 
     function removeAuthorizedEmail(email) {
@@ -712,9 +697,6 @@
       renderAuthorizedUsersList();
     }
 
-    // -------------------------------------------------------------
-    // CARDS STRUMENTI
-    // -------------------------------------------------------------
     function renderInstrumentCards() {
       const container = document.getElementById('instrumentCardsContainer');
       if (!container) return;
@@ -755,19 +737,19 @@
               currentBooking ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800'
             }">
               <span class="w-2 h-2 rounded-full ${currentBooking ? 'bg-amber-500' : 'bg-emerald-500'}"></span>
-              ${currentBooking ? 'In Uso Ora' : 'Disponibile'}
+              ${currentBooking ? 'In Use Now' : 'Available'}
             </span>
           </div>
 
           <h3 class="font-bold text-slate-900 text-base mb-1">${inst}</h3>
           <p class="text-xs text-slate-500 mb-4">
-            ${currentBooking ? `In uso da: <strong class="text-slate-700">${currentBooking.user}</strong>` : 'Nessuna prenotazione attiva ora'}
+            ${currentBooking ? `In use by: <strong class="text-slate-700">${currentBooking.user}</strong>` : 'No active booking right now'}
           </p>
 
           <button class="w-full py-2 rounded-lg text-xs font-semibold ${
             isSelected ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
           } transition flex items-center justify-center gap-1.5">
-            <i data-lucide="calendar" class="w-3.5 h-3.5"></i> ${isSelected ? 'Calendario Attivo' : 'Apri Calendario'}
+            <i data-lucide="calendar" class="w-3.5 h-3.5"></i> ${isSelected ? 'Active Calendar' : 'Open Calendar'}
           </button>
         `;
 
@@ -777,9 +759,6 @@
       safeCreateIcons();
     }
 
-    // -------------------------------------------------------------
-    // TIMELINE
-    // -------------------------------------------------------------
     function renderTimeline() {
       const container = document.getElementById('timelineSlots');
       if (!container) return;
@@ -805,7 +784,7 @@
           slot.innerHTML = `
             <div class="flex justify-between items-center text-xs font-bold">
               <span>${timeFormatted}</span>
-              <span class="text-[10px] bg-amber-200/60 px-1.5 py-0.5 rounded">Occupato</span>
+              <span class="text-[10px] bg-amber-200/60 px-1.5 py-0.5 rounded">Booked</span>
             </div>
             <div class="truncate text-xs font-medium mt-1">
               <i data-lucide="user" class="w-3 h-3 inline mr-1"></i>${booking.user}
@@ -817,10 +796,10 @@
           slot.innerHTML = `
             <div class="flex justify-between items-center text-xs font-bold text-emerald-800">
               <span>${timeFormatted}</span>
-              <span class="text-[10px] bg-emerald-200/60 px-1.5 py-0.5 rounded">Libero</span>
+              <span class="text-[10px] bg-emerald-200/60 px-1.5 py-0.5 rounded">Available</span>
             </div>
             <div class="text-[11px] text-emerald-700 flex items-center gap-1 font-medium mt-1">
-              <i data-lucide="plus" class="w-3 h-3"></i> Prenota
+              <i data-lucide="plus" class="w-3 h-3"></i> Book
             </div>
           `;
         }
@@ -831,9 +810,6 @@
       safeCreateIcons();
     }
 
-    // -------------------------------------------------------------
-    // PRENOTAZIONI
-    // -------------------------------------------------------------
     function openBookingModal(startTime = "09:00", endTime = "10:00") {
       document.getElementById('modalInstrument').value = selectedInstrument;
       document.getElementById('modalUser').value = currentUser ? currentUser.email : '';
@@ -858,7 +834,7 @@
       const endTime = document.getElementById('modalEndTime').value;
 
       if (startTime >= endTime) {
-        showAlert('error', 'Orario Errato', 'L\'ora di fine deve essere dopo l\'ora di inizio.');
+        showAlert('error', 'Invalid Time Range', 'End time must be after start time.');
         return;
       }
 
@@ -867,8 +843,8 @@
       if (conflict) {
         showAlert(
           'error', 
-          'Strumento Occupato!', 
-          `Lo strumento <strong>${inst}</strong> è già stato prenotato da <strong>${conflict.user}</strong> il ${date} (${conflict.startTime} - ${conflict.endTime}).`
+          'Instrument Occupied!', 
+          `The instrument <strong>${inst}</strong> is already booked by <strong>${conflict.user}</strong> on ${date} (${conflict.startTime} - ${conflict.endTime}).`
         );
         return;
       }
@@ -891,7 +867,7 @@
 
       closeBookingModal();
       refreshUI();
-      showAlert('success', 'Prenotazione Effettuata', `Prenotato ${inst} per il ${date}.`);
+      showAlert('success', 'Booking Confirmed', `Booked ${inst} for ${date}.`);
     }
 
     function checkConflict(instrument, date, start, end) {
@@ -913,7 +889,7 @@
     }
 
     function deleteBooking(id) {
-      if (!confirm("Confermi di voler eliminare la prenotazione?")) return;
+      if (!confirm("Are you sure you want to delete this booking?")) return;
 
       bookings = bookings.filter(b => b && b.id !== id);
       localStorage.setItem('lab_bookings', JSON.stringify(bookings));
@@ -923,7 +899,7 @@
       }
 
       refreshUI();
-      showAlert('info', 'Cancellato', 'La prenotazione è stata rimossa.');
+      showAlert('info', 'Deleted', 'Booking removed.');
     }
 
     function renderBookingList() {
@@ -941,7 +917,7 @@
       ).sort((a,b) => new Date((b.date||'') + 'T' + (b.startTime||'00:00')) - new Date((a.date||'') + 'T' + (a.startTime||'00:00')));
 
       if (filtered.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="5" class="p-6 text-center text-slate-400 text-xs">Nessuna prenotazione trovata.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="5" class="p-6 text-center text-slate-400 text-xs">No active bookings found.</td></tr>`;
         return;
       }
 
@@ -958,7 +934,7 @@
           <td class="p-3 font-medium text-slate-700">${b.startTime} - ${b.endTime}</td>
           <td class="p-3 text-right">
             ${isOwner ? `
-              <button onclick="deleteBooking('${b.id}')" class="text-red-500 hover:text-red-700 font-medium text-xs">Annulla</button>
+              <button onclick="deleteBooking('${b.id}')" class="text-red-500 hover:text-red-700 font-medium text-xs">Cancel</button>
             ` : '<span class="text-slate-300">-</span>'}
           </td>
         `;
@@ -967,9 +943,6 @@
       });
     }
 
-    // -------------------------------------------------------------
-    // STATISTICHE
-    // -------------------------------------------------------------
     function calculateHours(start, end) {
       if (!start || !end) return 0;
       const [sH, sM] = start.split(':').map(Number);
@@ -980,7 +953,7 @@
     function renderStats() {
       const userStatsMap = {};
       const dateStatsMap = {};
-      const instStatsMap = { 'CD Jasco-J1500': 0, 'Jasco-CPL300': 0, 'Fluorimetro': 0 };
+      const instStatsMap = { 'CD Jasco-J1500': 0, 'Jasco-CPL300': 0, 'Fluorometer': 0 };
 
       let grandTotal = 0;
 
@@ -991,7 +964,7 @@
         grandTotal += hrs;
 
         if (!userStatsMap[b.user]) {
-          userStatsMap[b.user] = { 'CD Jasco-J1500': 0, 'Jasco-CPL300': 0, 'Fluorimetro': 0, total: 0 };
+          userStatsMap[b.user] = { 'CD Jasco-J1500': 0, 'Jasco-CPL300': 0, 'Fluorometer': 0, total: 0 };
         }
         if (userStatsMap[b.user][b.instrument] !== undefined) {
           userStatsMap[b.user][b.instrument] += hrs;
@@ -1007,7 +980,7 @@
         dateStatsMap[b.date][b.user] += hrs;
       });
 
-      document.getElementById('statTotalHours').textContent = `${grandTotal.toFixed(1)} ore`;
+      document.getElementById('statTotalHours').textContent = `${grandTotal.toFixed(1)} hrs`;
 
       let topUser = '-';
       let maxUHours = 0;
@@ -1035,7 +1008,7 @@
       const usersList = Object.keys(userStatsMap).sort((a,b) => userStatsMap[b].total - userStatsMap[a].total);
 
       if (usersList.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="5" class="p-6 text-center text-slate-400 text-xs">Nessun dato di utilizzo registrato.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="5" class="p-6 text-center text-slate-400 text-xs">No usage data recorded yet.</td></tr>`;
       } else {
         usersList.forEach(u => {
           const row = userStatsMap[u];
@@ -1045,7 +1018,7 @@
             <td class="p-3 font-semibold text-slate-800">${u}</td>
             <td class="p-3 text-center text-slate-600">${row['CD Jasco-J1500'].toFixed(1)} h</td>
             <td class="p-3 text-center text-slate-600">${row['Jasco-CPL300'].toFixed(1)} h</td>
-            <td class="p-3 text-center text-slate-600">${row['Fluorimetro'].toFixed(1)} h</td>
+            <td class="p-3 text-center text-slate-600">${row['Fluorometer'].toFixed(1)} h</td>
             <td class="p-3 text-right font-bold text-blue-600">${row.total.toFixed(1)} h</td>
           `;
           tbody.appendChild(tr);
@@ -1067,7 +1040,7 @@
 
       const cdData = usersList.map(u => userStatsMap[u]['CD Jasco-J1500']);
       const cplData = usersList.map(u => userStatsMap[u]['Jasco-CPL300']);
-      const fluoData = usersList.map(u => userStatsMap[u]['Fluorimetro']);
+      const fluoData = usersList.map(u => userStatsMap[u]['Fluorometer']);
 
       barChartInstance = new Chart(ctx, {
         type: 'bar',
@@ -1076,14 +1049,14 @@
           datasets: [
             { label: 'CD Jasco-J1500', data: cdData, backgroundColor: '#3b82f6', borderRadius: 6 },
             { label: 'Jasco-CPL300', data: cplData, backgroundColor: '#10b981', borderRadius: 6 },
-            { label: 'Fluorimetro', data: fluoData, backgroundColor: '#f59e0b', borderRadius: 6 }
+            { label: 'Fluorometer', data: fluoData, backgroundColor: '#f59e0b', borderRadius: 6 }
           ]
         },
         options: {
           responsive: true,
           maintainAspectRatio: false,
           plugins: { legend: { position: 'bottom' } },
-          scales: { y: { beginAtZero: true } }
+          scales: { y: { title: { display: true, text: 'Usage Hours' }, beginAtZero: true } }
         }
       });
     }
@@ -1118,14 +1091,14 @@
           responsive: true,
           maintainAspectRatio: false,
           plugins: { legend: { position: 'bottom' } },
-          scales: { y: { beginAtZero: true } }
+          scales: {
+            x: { title: { display: true, text: 'Date' } },
+            y: { title: { display: true, text: 'Booked Hours' }, beginAtZero: true }
+          }
         }
       });
     }
 
-    // -------------------------------------------------------------
-    // BANNER NOTIFICHE (z-[100])
-    // -------------------------------------------------------------
     function showAlert(type, title, message) {
       const banner = document.getElementById('alertBanner');
       if (!banner) return;
