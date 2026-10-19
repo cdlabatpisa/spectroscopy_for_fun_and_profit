@@ -11,13 +11,10 @@
   <script src="https://unpkg.com/lucide@latest"></script>
   <!-- Chart.js -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <!-- Firebase JS SDK (v9 compat) -->
-  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
 </head>
 <body class="bg-slate-50 text-slate-800 font-sans min-h-screen flex flex-col">
 
-  <!-- CONFLICT AND NOTIFICATION ALERT BANNER -->
+  <!-- ALERT BANNER -->
   <div id="alertBanner" class="hidden fixed top-5 left-1/2 -translate-x-1/2 z-[100] w-11/12 max-w-xl p-4 rounded-xl shadow-2xl transition-all duration-300 flex items-start gap-3 border">
     <i id="alertIcon" data-lucide="alert-triangle" class="w-6 h-6 flex-shrink-0 mt-0.5"></i>
     <div class="flex-1">
@@ -46,7 +43,7 @@
       <div class="flex items-center gap-3">
         <div id="cloudStatusBadge" class="flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-emerald-950 text-emerald-400 border border-emerald-800">
           <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-          <span id="cloudStatusText">Cloud Sync Active</span>
+          <span id="cloudStatusText">Global Cloud Sync Active</span>
         </div>
 
         <div id="userInfoHeader" class="hidden items-center gap-3">
@@ -68,7 +65,7 @@
   <!-- MAIN CONTENT -->
   <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
 
-    <!-- LOGIN / REGISTRATION SECTION -->
+    <!-- AUTH SECTION -->
     <div id="authSection" class="max-w-md mx-auto my-12 bg-white rounded-2xl shadow-xl border border-slate-200 overflow-hidden">
       <div class="bg-slate-900 p-6 text-center text-white">
         <i data-lucide="lock" class="w-10 h-10 mx-auto text-blue-400 mb-2"></i>
@@ -135,9 +132,7 @@
             <span class="text-xs text-slate-500">Real-time status</span>
           </div>
 
-          <div class="grid grid-cols-1 md:grid-cols-3 gap-6" id="instrumentCardsContainer">
-            <!-- Populated via JS -->
-          </div>
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-6" id="instrumentCardsContainer"></div>
         </section>
 
         <!-- CALENDAR & TIMELINE -->
@@ -168,9 +163,7 @@
               </div>
             </div>
 
-            <div id="timelineSlots" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
-              <!-- Slots populated via JS -->
-            </div>
+            <div id="timelineSlots" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3"></div>
           </div>
         </section>
 
@@ -194,9 +187,7 @@
                   <th class="p-3 text-right">Action</th>
                 </tr>
               </thead>
-              <tbody id="bookingsTableBody" class="divide-y divide-slate-100">
-                <!-- Table rows -->
-              </tbody>
+              <tbody id="bookingsTableBody" class="divide-y divide-slate-100"></tbody>
             </table>
           </div>
         </section>
@@ -254,9 +245,7 @@
                   <th class="p-3 text-right font-bold">Total Hours</th>
                 </tr>
               </thead>
-              <tbody id="userStatsTableBody" class="divide-y divide-slate-100">
-                <!-- User stats rows -->
-              </tbody>
+              <tbody id="userStatsTableBody" class="divide-y divide-slate-100"></tbody>
             </table>
           </div>
         </section>
@@ -275,7 +264,7 @@
             </div>
           </div>
 
-          <!-- SHARP POLYLINE TIME-SERIES CHART ("GRAFICO A LINEA SPEZZATA") -->
+          <!-- SHARP POLYLINE TIME-SERIES CHART ("GRAFICO A CURVA SPEZZATA") -->
           <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col">
             <div class="flex items-center justify-between mb-4 flex-wrap gap-2">
               <div>
@@ -375,15 +364,13 @@
 
         <div>
           <h4 class="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Authorized Email List</h4>
-          <div class="max-h-56 overflow-y-auto border border-slate-100 rounded-xl divide-y" id="authorizedListContainer">
-            <!-- Populated via JS -->
-          </div>
+          <div class="max-h-56 overflow-y-auto border border-slate-100 rounded-xl divide-y" id="authorizedListContainer"></div>
         </div>
       </div>
     </div>
   </div>
 
-  <!-- JAVASCRIPT APP LOGIC -->
+  <!-- JAVASCRIPT APPLICATION LOGIC -->
   <script>
     function getStorageItem(key, fallback) {
       try {
@@ -401,10 +388,10 @@
     }
 
     // -------------------------------------------------------------
-    // ATOMIC CROSS-DEVICE SYNC ENGINE
+    // REAL-TIME CLOUD SYNC ENGINE (Public CORS-enabled REST Storage)
     // -------------------------------------------------------------
-    const SYNC_KEY = "lab_spectroscopy_pisa_unipi_2026_shared_db";
-    const broadcastChannel = typeof BroadcastChannel !== 'undefined' ? new BroadcastChannel('lab_booking_sync_channel') : null;
+    const CLOUD_APP_KEY = "spectroscopy_lab_pisa_unipi_2026_shared_db";
+    const API_URL = `https://keyvalue.immanuel.co/api/KeyVal`;
 
     const ADMIN_EMAIL = "matteo.cei@phd.unipi.it";
     const INSTRUMENTS = ["CD Jasco-J1500", "Jasco-CPL300", "Fluorometer"];
@@ -416,26 +403,25 @@
     let currentView = 'booking';
     let selectedInstrument = INSTRUMENTS[0];
     let currentUser = getStorageItem('lab_current_user', null);
+
     let bookings = getStorageItem('lab_bookings', []);
+    let authorizedUsers = getStorageItem('lab_authorized_users', []);
+    let registeredPasses = getStorageItem('lab_registered_passes', {});
 
     let barChartInstance = null;
     let lineChartInstance = null;
 
-    let authorizedUsers = getStorageItem('lab_authorized_users', []);
     if (!Array.isArray(authorizedUsers)) authorizedUsers = [];
     if (!authorizedUsers.some(u => u && u.email && u.email.toLowerCase() === ADMIN_EMAIL.toLowerCase())) {
       authorizedUsers.push({ email: ADMIN_EMAIL, status: 'Registered' });
-      localStorage.setItem('lab_authorized_users', JSON.stringify(authorizedUsers));
     }
 
-    let registeredPasses = getStorageItem('lab_registered_passes', {});
     if (typeof registeredPasses !== 'object' || registeredPasses === null) registeredPasses = {};
     if (!registeredPasses[ADMIN_EMAIL.toLowerCase()]) {
       registeredPasses[ADMIN_EMAIL.toLowerCase()] = "admin123";
-      localStorage.setItem('lab_registered_passes', JSON.stringify(registeredPasses));
     }
 
-    // Dynamic Status Evaluation (guarantees Registered status if email has password)
+    // Dynamic Registered Status Verification
     function isUserRegistered(email) {
       if (!email) return false;
       const lower = email.toLowerCase();
@@ -444,88 +430,66 @@
       return found && found.status === 'Registered';
     }
 
-    // Sync Data Across Local Browsers and Cloud Relays
-    function syncAndPropagateData() {
-      // 1. Save locally
+    // Save and Sync Data across network
+    async function syncAndPropagateData() {
       localStorage.setItem('lab_bookings', JSON.stringify(bookings));
       localStorage.setItem('lab_authorized_users', JSON.stringify(authorizedUsers));
       localStorage.setItem('lab_registered_passes', JSON.stringify(registeredPasses));
 
-      // 2. Broadcast to other open tabs / windows instantly
-      if (broadcastChannel) {
-        broadcastChannel.postMessage({
-          type: 'SYNC_UPDATE',
-          bookings: bookings,
-          authorizedUsers: authorizedUsers,
-          registeredPasses: registeredPasses
-        });
-      }
-
-      // 3. Cloud Relay Push
-      const statePayload = {
+      const payload = {
         bookings: bookings,
         authorizedUsers: authorizedUsers,
         registeredPasses: registeredPasses,
-        updatedAt: Date.now()
+        timestamp: Date.now()
       };
 
       try {
-        fetch('https://jsonblob.com/api/jsonBlob/1200000000000000000', {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(statePayload)
-        }).catch(() => {});
+        const encodedData = encodeURIComponent(JSON.stringify(payload));
+        await fetch(`${API_URL}/UpdateValue/${CLOUD_APP_KEY}/${encodedData}`);
       } catch (e) {}
     }
 
-    // Pull Remote Updates & Merge Arrays Without Loss
-    function pullAndMergeCloudData() {
-      fetch('https://jsonblob.com/api/jsonBlob/1200000000000000000')
-        .then(res => res.json())
-        .then(data => {
-          if (data) {
-            if (Array.isArray(data.bookings)) {
-              // Merge bookings by ID
-              const map = new Map();
-              bookings.forEach(b => { if (b && b.id) map.set(b.id, b); });
-              data.bookings.forEach(b => { if (b && b.id) map.set(b.id, b); });
-              bookings = Array.from(map.values());
-              localStorage.setItem('lab_bookings', JSON.stringify(bookings));
-            }
+    // Pull Remote Cloud Updates and Merge
+    async function pullCloudData() {
+      try {
+        const response = await fetch(`${API_URL}/GetValue/${CLOUD_APP_KEY}`);
+        if (!response.ok) return;
 
-            if (data.registeredPasses) {
-              registeredPasses = { ...registeredPasses, ...data.registeredPasses };
-              localStorage.setItem('lab_registered_passes', JSON.stringify(registeredPasses));
-            }
+        const rawText = await response.text();
+        if (!rawText || rawText === "null" || rawText.trim() === "") return;
 
-            if (Array.isArray(data.authorizedUsers)) {
-              const userMap = new Map();
-              authorizedUsers.forEach(u => { if (u && u.email) userMap.set(u.email.toLowerCase(), u); });
-              data.authorizedUsers.forEach(u => { if (u && u.email) userMap.set(u.email.toLowerCase(), u); });
-              authorizedUsers = Array.from(userMap.values());
-              localStorage.setItem('lab_authorized_users', JSON.stringify(authorizedUsers));
-            }
+        let data = null;
+        try {
+          data = JSON.parse(JSON.parse(rawText));
+        } catch (e) {
+          try { data = JSON.parse(rawText); } catch(err) {}
+        }
 
-            refreshUI();
+        if (data) {
+          if (Array.isArray(data.bookings)) {
+            const map = new Map();
+            bookings.forEach(b => { if (b && b.id) map.set(b.id, b); });
+            data.bookings.forEach(b => { if (b && b.id) map.set(b.id, b); });
+            bookings = Array.from(map.values());
+            localStorage.setItem('lab_bookings', JSON.stringify(bookings));
           }
-        })
-        .catch(() => {});
-    }
 
-    if (broadcastChannel) {
-      broadcastChannel.onmessage = (event) => {
-        if (event.data && event.data.type === 'SYNC_UPDATE') {
-          if (Array.isArray(event.data.bookings)) bookings = event.data.bookings;
-          if (Array.isArray(event.data.authorizedUsers)) authorizedUsers = event.data.authorizedUsers;
-          if (event.data.registeredPasses) registeredPasses = event.data.registeredPasses;
-          
-          localStorage.setItem('lab_bookings', JSON.stringify(bookings));
-          localStorage.setItem('lab_authorized_users', JSON.stringify(authorizedUsers));
-          localStorage.setItem('lab_registered_passes', JSON.stringify(registeredPasses));
-          
+          if (data.registeredPasses) {
+            registeredPasses = { ...registeredPasses, ...data.registeredPasses };
+            localStorage.setItem('lab_registered_passes', JSON.stringify(registeredPasses));
+          }
+
+          if (Array.isArray(data.authorizedUsers)) {
+            const userMap = new Map();
+            authorizedUsers.forEach(u => { if (u && u.email) userMap.set(u.email.toLowerCase(), u); });
+            data.authorizedUsers.forEach(u => { if (u && u.email) userMap.set(u.email.toLowerCase(), u); });
+            authorizedUsers = Array.from(userMap.values());
+            localStorage.setItem('lab_authorized_users', JSON.stringify(authorizedUsers));
+          }
+
           refreshUI();
         }
-      };
+      } catch (e) {}
     }
 
     document.addEventListener("DOMContentLoaded", () => {
@@ -534,8 +498,8 @@
       if (dateElem) dateElem.value = new Date().toISOString().split('T')[0];
       
       checkAuthStatus();
-      pullAndMergeCloudData();
-      setInterval(pullAndMergeCloudData, 3000);
+      pullCloudData();
+      setInterval(pullCloudData, 3000); // 3-second live cloud poll
     });
 
     function refreshUI() {
@@ -644,7 +608,6 @@
         currentUser = { email: email };
         localStorage.setItem('lab_current_user', JSON.stringify(currentUser));
         
-        // Update status to Registered dynamically
         const userIndex = authorizedUsers.findIndex(u => u && u.email && u.email.toLowerCase() === email);
         if (userIndex !== -1) {
           authorizedUsers[userIndex].status = 'Registered';
@@ -724,7 +687,6 @@
       authorizedUsers.forEach((u) => {
         if (!u || !u.email) return;
         
-        // Dynamically compute status: Registered if password exists or status is Registered
         const isReg = isUserRegistered(u.email);
         const statusLabel = isReg ? 'Registered' : 'Pending';
 
@@ -1139,7 +1101,7 @@
       });
     }
 
-    // CHART 2: STRICT SHARP POLYLINE ("SPEZZATA PURA" - TENSION: 0)
+    // CHART 2: STRICT SHARP POLYLINE ("CURVA SPEZZATA" - TENSION: 0)
     function renderSharpPolylineChart(timeBucketStatsMap, usersList, timeFrame) {
       const canvas = document.getElementById('lineChartTimeline');
       if (!canvas) return;
@@ -1159,7 +1121,7 @@
           borderColor: color,
           backgroundColor: color,
           borderWidth: 3,
-          tension: 0, // STRICT SHARP SEGMENTS (NO CURVES)
+          tension: 0, // SHARP STRAIGHT LINES ONLY
           pointRadius: 5,
           pointHoverRadius: 7,
           pointBackgroundColor: color,
