@@ -1,0 +1,824 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Gestione Prenotazioni Strumenti Laboratorio</title>
+  
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <!-- Firebase JS SDK (v9 compat) -->
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+</head>
+<body class="bg-slate-50 text-slate-800 font-sans min-h-screen flex flex-col">
+
+  <!-- BANNER NOTIFICA CONFLITTI E AVVISI (In sovrimpressione z-[100]) -->
+  <div id="alertBanner" class="hidden fixed top-5 left-1/2 -translate-x-1/2 z-[100] w-11/12 max-w-xl p-4 rounded-xl shadow-2xl transition-all duration-300 flex items-start gap-3 border">
+    <i id="alertIcon" data-lucide="alert-triangle" class="w-6 h-6 flex-shrink-0 mt-0.5"></i>
+    <div class="flex-1">
+      <h4 id="alertTitle" class="font-bold text-base"></h4>
+      <p id="alertMessage" class="text-sm mt-1"></p>
+    </div>
+    <button onclick="hideAlert()" class="text-slate-400 hover:text-slate-700">
+      <i data-lucide="x" class="w-5 h-5"></i>
+    </button>
+  </div>
+
+  <!-- HEADER / NAVBAR -->
+  <header class="bg-slate-900 text-white shadow-md sticky top-0 z-30">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <div class="bg-blue-600 p-2 rounded-lg">
+          <i data-lucide="flask-conical" class="w-6 h-6 text-white"></i>
+        </div>
+        <div>
+          <h1 class="font-bold text-lg leading-tight">Prenotazione Strumenti</h1>
+          <p class="text-xs text-slate-400">Laboratorio di Spettroscopia</p>
+        </div>
+      </div>
+
+      <!-- User Menu & Cloud Status -->
+      <div class="flex items-center gap-3">
+        <div id="cloudStatusBadge" class="hidden sm:flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-emerald-950 text-emerald-400 border border-emerald-800">
+          <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+          <span>Cloud Attivo</span>
+        </div>
+
+        <div id="userInfoHeader" class="hidden items-center gap-3">
+          <div class="text-right">
+            <span id="userEmailDisplay" class="text-sm font-medium block text-slate-200"></span>
+            <span id="userRoleBadge" class="text-[10px] uppercase font-bold text-blue-400 bg-blue-950/60 px-2 py-0.5 rounded border border-blue-800">Utente</span>
+          </div>
+          <button id="adminPanelBtn" onclick="openAdminModal()" class="hidden bg-slate-800 hover:bg-slate-700 text-amber-400 px-3 py-1.5 rounded-lg text-xs font-medium border border-amber-500/30 transition flex items-center gap-1.5">
+            <i data-lucide="shield-check" class="w-4 h-4"></i> Gestisci Utenti
+          </button>
+          <button onclick="logout()" class="bg-red-600/20 hover:bg-red-600/40 text-red-300 p-2 rounded-lg border border-red-500/30 transition" title="Disconnetti">
+            <i data-lucide="log-out" class="w-4 h-4"></i>
+          </button>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- CONTENUTO PRINCIPALE -->
+  <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
+
+    <!-- SCHERMATA LOGIN / REGISTRAZIONE -->
+    <div id="authSection" class="max-w-md mx-auto my-12 bg-white rounded-2xl shadow-xl border border-slate-200 overflow-hidden">
+      <div class="bg-slate-900 p-6 text-center text-white">
+        <i data-lucide="lock" class="w-10 h-10 mx-auto text-blue-400 mb-2"></i>
+        <h2 class="text-xl font-bold">Accesso Laboratorio</h2>
+        <p class="text-xs text-slate-400 mt-1">Inserisci le tue credenziali autorizzate per accedere</p>
+      </div>
+
+      <div class="p-6">
+        <div class="flex border-b border-slate-200 mb-6">
+          <button id="tabLogin" onclick="switchAuthTab('login')" class="flex-1 py-2 text-center font-semibold text-blue-600 border-b-2 border-blue-600">Accedi</button>
+          <button id="tabRegister" onclick="switchAuthTab('register')" class="flex-1 py-2 text-center font-semibold text-slate-400 border-b-2 border-transparent">Prima Registrazione</button>
+        </div>
+
+        <!-- Form Login -->
+        <form id="loginForm" onsubmit="handleLogin(event)" class="space-y-4">
+          <div>
+            <label class="block text-xs font-semibold text-slate-600 mb-1">Email Istituzionale</label>
+            <input type="email" id="loginEmail" required placeholder="matteo.cei@phd.unipi.it" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm">
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-600 mb-1">Password</label>
+            <input type="password" id="loginPassword" required placeholder="••••••••" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm">
+          </div>
+          <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2.5 rounded-lg transition shadow-md text-sm">Entra nel Sistema</button>
+        </form>
+
+        <!-- Form Prima Registrazione -->
+        <form id="registerForm" onsubmit="handleRegister(event)" class="space-y-4 hidden">
+          <div>
+            <label class="block text-xs font-semibold text-slate-600 mb-1">Email Autorizzata</label>
+            <input type="email" id="regEmail" required placeholder="nome.cognome@phd.unipi.it" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm">
+            <span class="text-[11px] text-slate-400">L'email deve essere stata approvata dall'Amministratore</span>
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-600 mb-1">Scegli una Password</label>
+            <input type="password" id="regPassword" required minlength="4" placeholder="Scegli la tua password" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm">
+          </div>
+          <button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-2.5 rounded-lg transition shadow-md text-sm">Salva Password e Accedi</button>
+        </form>
+      </div>
+    </div>
+
+    <!-- DASHBOARD APPLICAZIONE -->
+    <div id="appDashboard" class="hidden space-y-8">
+
+      <!-- I TRE STRUMENTI -->
+      <section>
+        <div class="flex items-center justify-between mb-4">
+          <h2 class="text-xl font-bold text-slate-800 flex items-center gap-2">
+            <i data-lucide="cpu" class="w-5 h-5 text-blue-600"></i> Seleziona uno Strumento
+          </h2>
+          <span class="text-xs text-slate-500">Stato in tempo reale</span>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6" id="instrumentCardsContainer">
+          <!-- Card degli strumenti caricate via JS -->
+        </div>
+      </section>
+
+      <!-- CALENDARIO E TIMELINE -->
+      <section class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 space-y-6">
+        <div class="flex flex-wrap items-center justify-between gap-4 pb-4 border-b border-slate-100">
+          <div>
+            <h3 id="currentInstrumentTitle" class="text-lg font-bold text-slate-900">CD Jasco-J1500</h3>
+            <p class="text-xs text-slate-500">Occupazione oraria del giorno selezionato</p>
+          </div>
+
+          <div class="flex items-center gap-3">
+            <div>
+              <label class="text-xs font-medium text-slate-600 mr-2">Data:</label>
+              <input type="date" id="selectedDate" onchange="renderTimeline()" class="px-3 py-1.5 border rounded-lg text-sm font-medium text-slate-700 outline-none focus:ring-2 focus:ring-blue-500">
+            </div>
+            <button onclick="openBookingModal()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-semibold flex items-center gap-2 shadow-sm transition">
+              <i data-lucide="plus-circle" class="w-4 h-4"></i> Nuova Prenotazione
+            </button>
+          </div>
+        </div>
+
+        <div>
+          <div class="flex items-center justify-between mb-3">
+            <span class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Fasce Orarie (08:00 - 20:00)</span>
+            <div class="flex items-center gap-4 text-xs font-medium">
+              <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-full bg-emerald-500 inline-block"></span> Libero</span>
+              <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-full bg-amber-500 inline-block"></span> Occupato</span>
+            </div>
+          </div>
+
+          <div id="timelineSlots" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
+            <!-- Slot popolati via JS -->
+          </div>
+        </div>
+      </section>
+
+      <!-- REGISTRO PRENOTAZIONI -->
+      <section class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+        <div class="flex items-center justify-between mb-4">
+          <h3 class="text-base font-bold text-slate-900 flex items-center gap-2">
+            <i data-lucide="list-checks" class="w-5 h-5 text-blue-600"></i> Registro Prenotazioni Attive
+          </h3>
+          <input type="text" id="searchInput" oninput="renderBookingList()" placeholder="Cerca utente o data..." class="px-3 py-1.5 border rounded-lg text-xs w-52 focus:ring-2 focus:ring-blue-500 outline-none">
+        </div>
+
+        <div class="overflow-x-auto">
+          <table class="w-full text-left border-collapse text-sm">
+            <thead>
+              <tr class="bg-slate-50 text-slate-500 text-xs uppercase font-semibold border-b">
+                <th class="p-3">Strumento</th>
+                <th class="p-3">Utente</th>
+                <th class="p-3">Data</th>
+                <th class="p-3">Orario</th>
+                <th class="p-3 text-right">Azione</th>
+              </tr>
+            </thead>
+            <tbody id="bookingsTableBody" class="divide-y divide-slate-100">
+              <!-- Righe tabella -->
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+    </div>
+  </main>
+
+  <!-- MODALE MODULO PRENOTAZIONE -->
+  <div id="bookingModal" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl shadow-2xl max-w-md w-full overflow-hidden border border-slate-100">
+      <div class="bg-slate-900 p-4 text-white flex justify-between items-center">
+        <h3 class="font-bold text-base flex items-center gap-2">
+          <i data-lucide="calendar-plus" class="w-5 h-5 text-blue-400"></i> Prenota Strumento
+        </h3>
+        <button onclick="closeBookingModal()" class="text-slate-400 hover:text-white">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <form id="bookingForm" onsubmit="saveBooking(event)" class="p-6 space-y-4">
+        <!-- 1. Menù a tendina Strumento -->
+        <div>
+          <label class="block text-xs font-semibold text-slate-700 mb-1">Strumento</label>
+          <select id="modalInstrument" class="w-full px-3 py-2 border rounded-lg text-sm bg-white focus:ring-2 focus:ring-blue-500 outline-none">
+            <option value="CD Jasco-J1500">CD Jasco-J1500</option>
+            <option value="Jasco-CPL300">Jasco-CPL300</option>
+            <option value="Fluorimetro">Fluorimetro</option>
+          </select>
+        </div>
+
+        <!-- 2. Nome Utente (Automatico) -->
+        <div>
+          <label class="block text-xs font-semibold text-slate-700 mb-1">Nome Utente</label>
+          <input type="text" id="modalUser" readonly class="w-full px-3 py-2 border rounded-lg text-sm bg-slate-100 text-slate-600 font-medium outline-none cursor-not-allowed">
+        </div>
+
+        <!-- 3. Data -->
+        <div>
+          <label class="block text-xs font-semibold text-slate-700 mb-1">Data Prenotazione</label>
+          <input type="date" id="modalDate" required class="w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none">
+        </div>
+
+        <!-- 4. Ora Inizio e Fine -->
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">Ora Inizio</label>
+            <input type="time" id="modalStartTime" required step="1800" class="w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none">
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">Ora Fine</label>
+            <input type="time" id="modalEndTime" required step="1800" class="w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none">
+          </div>
+        </div>
+
+        <div class="pt-4 flex items-center justify-end gap-3 border-t border-slate-100">
+          <button type="button" onclick="closeBookingModal()" class="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-lg">Annulla</button>
+          <button type="submit" class="px-5 py-2 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-sm">Conferma Prenotazione</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODALE PANNELLO ADMIN (Solo per matteo.cei@phd.unipi.it) -->
+  <div id="adminModal" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl shadow-2xl max-w-lg w-full overflow-hidden border border-slate-100">
+      <div class="bg-slate-900 p-4 text-white flex justify-between items-center">
+        <h3 class="font-bold text-base flex items-center gap-2">
+          <i data-lucide="shield" class="w-5 h-5 text-amber-400"></i> Gestione Utenti Autorizzati (Admin)
+        </h3>
+        <button onclick="closeAdminModal()" class="text-slate-400 hover:text-white">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <div class="p-6 space-y-6">
+        <form onsubmit="addAuthorizedEmail(event)" class="flex gap-2">
+          <input type="email" id="newAuthEmail" required placeholder="nuovo.ricercatore@phd.unipi.it" class="flex-1 px-3 py-2 border rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500">
+          <button type="submit" class="bg-emerald-600 hover:bg-emerald-700 text-white font-medium px-4 py-2 rounded-lg text-sm transition">Autorizza Email</button>
+        </form>
+
+        <div>
+          <h4 class="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Lista Email Abilitate</h4>
+          <div class="max-h-56 overflow-y-auto border border-slate-100 rounded-xl divide-y" id="authorizedListContainer">
+            <!-- Popolato via JS -->
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- JAVASCRIPT APP LOGIC -->
+  <script>
+    // -------------------------------------------------------------
+    // CONFIGURAZIONE CLOUD DATABASE (FIREBASE FIRESTORE)
+    // -------------------------------------------------------------
+    const firebaseConfig = {
+      apiKey: "PASTE_YOUR_API_KEY_HERE",
+      authDomain: "lab-booking.firebaseapp.com",
+      projectId: "lab-booking",
+      storageBucket: "lab-booking.appspot.com",
+      messagingSenderId: "123456789",
+      appId: "1:123456789:web:abcdef"
+    };
+
+    let db = null;
+    let isCloudEnabled = false;
+
+    try {
+      if (firebaseConfig.apiKey && firebaseConfig.apiKey !== "PASTE_YOUR_API_KEY_HERE") {
+        firebase.initializeApp(firebaseConfig);
+        db = firebase.firestore();
+        isCloudEnabled = true;
+        document.getElementById('cloudStatusBadge').classList.remove('hidden');
+      }
+    } catch(e) {
+      console.log("Firebase non configurato. Uso della modalità LocalStorage.");
+    }
+
+    // -------------------------------------------------------------
+    // COSTANTI E STATO INIZIALE
+    // -------------------------------------------------------------
+    const ADMIN_EMAIL = "matteo.cei@phd.unipi.it";
+    const INSTRUMENTS = ["CD Jasco-J1500", "Jasco-CPL300", "Fluorimetro"];
+
+    let selectedInstrument = INSTRUMENTS[0];
+    let currentUser = JSON.parse(localStorage.getItem('lab_current_user')) || null;
+    let bookings = JSON.parse(localStorage.getItem('lab_bookings')) || [];
+
+    // GARANZIA PRESENZA ADMIN IN LOCALSTORAGE
+    let authorizedUsers = JSON.parse(localStorage.getItem('lab_authorized_users')) || [];
+    if (!authorizedUsers.some(u => u.email.toLowerCase() === ADMIN_EMAIL.toLowerCase())) {
+      authorizedUsers.push({ email: ADMIN_EMAIL, status: 'Registered' });
+      localStorage.setItem('lab_authorized_users', JSON.stringify(authorizedUsers));
+    }
+
+    let registeredPasses = JSON.parse(localStorage.getItem('lab_registered_passes')) || {};
+    if (!registeredPasses[ADMIN_EMAIL.toLowerCase()]) {
+      registeredPasses[ADMIN_EMAIL.toLowerCase()] = "admin123";
+      localStorage.setItem('lab_registered_passes', JSON.stringify(registeredPasses));
+    }
+
+    // -------------------------------------------------------------
+    // SINCRONIZZAZIONE DATI
+    // -------------------------------------------------------------
+    function initDataSync() {
+      if (isCloudEnabled && db) {
+        db.collection("bookings").onSnapshot((snapshot) => {
+          bookings = [];
+          snapshot.forEach((doc) => bookings.push({ id: doc.id, ...doc.data() }));
+          localStorage.setItem('lab_bookings', JSON.stringify(bookings));
+          refreshUI();
+        });
+
+        db.collection("authorizedUsers").onSnapshot((snapshot) => {
+          authorizedUsers = [];
+          snapshot.forEach((doc) => authorizedUsers.push(doc.data()));
+          localStorage.setItem('lab_authorized_users', JSON.stringify(authorizedUsers));
+          renderAuthorizedUsersList();
+        });
+      } else {
+        refreshUI();
+      }
+    }
+
+    document.addEventListener("DOMContentLoaded", () => {
+      lucide.createIcons();
+      document.getElementById('selectedDate').value = new Date().toISOString().split('T')[0];
+      checkAuthStatus();
+      initDataSync();
+    });
+
+    function refreshUI() {
+      renderInstrumentCards();
+      renderTimeline();
+      renderBookingList();
+    }
+
+    // -------------------------------------------------------------
+    // AUTENTICAZIONE E LOGOUT
+    // -------------------------------------------------------------
+    function checkAuthStatus() {
+      const authSection = document.getElementById('authSection');
+      const appDashboard = document.getElementById('appDashboard');
+      const userInfoHeader = document.getElementById('userInfoHeader');
+      const adminPanelBtn = document.getElementById('adminPanelBtn');
+
+      if (currentUser) {
+        authSection.classList.add('hidden');
+        appDashboard.classList.remove('hidden');
+        userInfoHeader.classList.remove('hidden');
+        userInfoHeader.classList.add('flex');
+
+        document.getElementById('userEmailDisplay').textContent = currentUser.email;
+
+        if (currentUser.email.toLowerCase() === ADMIN_EMAIL.toLowerCase()) {
+          adminPanelBtn.classList.remove('hidden');
+          document.getElementById('userRoleBadge').textContent = "Admin";
+        } else {
+          adminPanelBtn.classList.add('hidden');
+          document.getElementById('userRoleBadge').textContent = "Utente";
+        }
+
+        refreshUI();
+      } else {
+        authSection.classList.remove('hidden');
+        appDashboard.classList.add('hidden');
+        userInfoHeader.classList.add('hidden');
+      }
+    }
+
+    function switchAuthTab(tab) {
+      const loginForm = document.getElementById('loginForm');
+      const registerForm = document.getElementById('registerForm');
+      const tabLogin = document.getElementById('tabLogin');
+      const tabRegister = document.getElementById('tabRegister');
+
+      if (tab === 'login') {
+        loginForm.classList.remove('hidden');
+        registerForm.classList.add('hidden');
+        tabLogin.className = "flex-1 py-2 text-center font-semibold text-blue-600 border-b-2 border-blue-600";
+        tabRegister.className = "flex-1 py-2 text-center font-semibold text-slate-400 border-b-2 border-transparent";
+      } else {
+        loginForm.classList.add('hidden');
+        registerForm.classList.remove('hidden');
+        tabRegister.className = "flex-1 py-2 text-center font-semibold text-blue-600 border-b-2 border-blue-600";
+        tabLogin.className = "flex-1 py-2 text-center font-semibold text-slate-400 border-b-2 border-transparent";
+      }
+    }
+
+    function handleLogin(e) {
+      e.preventDefault();
+      const email = document.getElementById('loginEmail').value.trim().toLowerCase();
+      const pass = document.getElementById('loginPassword').value;
+
+      if (registeredPasses[email] && registeredPasses[email] === pass) {
+        currentUser = { email: email };
+        localStorage.setItem('lab_current_user', JSON.stringify(currentUser));
+        checkAuthStatus();
+        showAlert('success', 'Accesso effettuato', `Benvenuto/a ${email}`);
+      } else {
+        showAlert('error', 'Credenziali errate', 'Password non corretta. Se è il primo accesso passa alla scheda "Prima Registrazione".');
+      }
+    }
+
+    function handleRegister(e) {
+      e.preventDefault();
+      const email = document.getElementById('regEmail').value.trim().toLowerCase();
+      const pass = document.getElementById('regPassword').value;
+
+      const isAuthorized = authorizedUsers.some(u => u.email.toLowerCase() === email);
+
+      if (!isAuthorized) {
+        showAlert('error', 'Email Non Autorizzata', `L'email ${email} non è presente nella lista del laboratorio. Contatta matteo.cei@phd.unipi.it.`);
+        return;
+      }
+
+      registeredPasses[email] = pass;
+      localStorage.setItem('lab_registered_passes', JSON.stringify(registeredPasses));
+
+      const userIndex = authorizedUsers.findIndex(u => u.email.toLowerCase() === email);
+      if (userIndex !== -1) {
+        authorizedUsers[userIndex].status = 'Registered';
+      } else {
+        authorizedUsers.push({ email: email, status: 'Registered' });
+      }
+      localStorage.setItem('lab_authorized_users', JSON.stringify(authorizedUsers));
+
+      currentUser = { email: email };
+      localStorage.setItem('lab_current_user', JSON.stringify(currentUser));
+      checkAuthStatus();
+      showAlert('success', 'Registrazione Registrata', 'La tua password è stata salvata con successo!');
+    }
+
+    function logout() {
+      currentUser = null;
+      localStorage.removeItem('lab_current_user');
+      checkAuthStatus();
+    }
+
+    // -------------------------------------------------------------
+    // AMMINISTRAZIONE UTENTI (ESCLUSIVO matteo.cei@phd.unipi.it)
+    // -------------------------------------------------------------
+    function openAdminModal() {
+      if (!currentUser || currentUser.email.toLowerCase() !== ADMIN_EMAIL.toLowerCase()) {
+        showAlert('error', 'Non Autorizzato', 'Solo l\'amministratore (matteo.cei@phd.unipi.it) può gestire gli utenti.');
+        return;
+      }
+      renderAuthorizedUsersList();
+      document.getElementById('adminModal').classList.remove('hidden');
+    }
+
+    function closeAdminModal() {
+      document.getElementById('adminModal').classList.add('hidden');
+    }
+
+    function renderAuthorizedUsersList() {
+      const container = document.getElementById('authorizedListContainer');
+      container.innerHTML = '';
+
+      authorizedUsers.forEach((u) => {
+        const div = document.createElement('div');
+        div.className = "p-3 flex items-center justify-between text-sm";
+        div.innerHTML = `
+          <div>
+            <span class="font-medium text-slate-800">${u.email}</span>
+            <span class="ml-2 text-[10px] px-2 py-0.5 rounded ${u.status === 'Registered' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'} font-semibold">${u.status}</span>
+          </div>
+          ${u.email.toLowerCase() !== ADMIN_EMAIL.toLowerCase() ? `
+            <button onclick="removeAuthorizedEmail('${u.email}')" class="text-red-500 hover:text-red-700 p-1">
+              <i data-lucide="trash-2" class="w-4 h-4"></i>
+            </button>
+          ` : '<span class="text-xs text-slate-400 font-bold">Admin</span>'}
+        `;
+        container.appendChild(div);
+      });
+      lucide.createIcons();
+    }
+
+    function addAuthorizedEmail(e) {
+      e.preventDefault();
+      const email = document.getElementById('newAuthEmail').value.trim().toLowerCase();
+
+      if (authorizedUsers.some(u => u.email.toLowerCase() === email)) {
+        showAlert('warning', 'Email già presente', 'Questa email è già registrata nell\'elenco autorizzati.');
+        return;
+      }
+
+      const newUser = { email: email, status: 'Pending' };
+      authorizedUsers.push(newUser);
+      localStorage.setItem('lab_authorized_users', JSON.stringify(authorizedUsers));
+
+      if (isCloudEnabled && db) {
+        db.collection("authorizedUsers").add(newUser);
+      }
+
+      document.getElementById('newAuthEmail').value = '';
+      renderAuthorizedUsersList();
+      showAlert('success', 'Email Abilitata', `${email} è stata aggiunta. Può ora registrare la password.`);
+    }
+
+    function removeAuthorizedEmail(email) {
+      authorizedUsers = authorizedUsers.filter(u => u.email.toLowerCase() !== email.toLowerCase());
+      localStorage.setItem('lab_authorized_users', JSON.stringify(authorizedUsers));
+      renderAuthorizedUsersList();
+    }
+
+    // -------------------------------------------------------------
+    // CARD STRUMENTI
+    // -------------------------------------------------------------
+    function renderInstrumentCards() {
+      const container = document.getElementById('instrumentCardsContainer');
+      container.innerHTML = '';
+
+      const now = new Date();
+      const currentDateStr = now.toISOString().split('T')[0];
+      const currentMinutes = now.getHours() * 60 + now.getMinutes();
+
+      INSTRUMENTS.forEach(inst => {
+        const currentBooking = bookings.find(b => {
+          if (b.instrument !== inst || b.date !== currentDateStr) return false;
+          const [sH, sM] = b.startTime.split(':').map(Number);
+          const [eH, eM] = b.endTime.split(':').map(Number);
+          const start = sH * 60 + sM;
+          const end = eH * 60 + eM;
+          return currentMinutes >= start && currentMinutes < end;
+        });
+
+        const isSelected = selectedInstrument === inst;
+
+        const card = document.createElement('div');
+        card.className = `p-5 rounded-2xl border transition-all cursor-pointer shadow-sm relative overflow-hidden ${
+          isSelected ? 'bg-blue-50/50 border-blue-500 ring-2 ring-blue-500/20' : 'bg-white border-slate-200 hover:border-slate-300'
+        }`;
+
+        card.onclick = () => {
+          selectedInstrument = inst;
+          document.getElementById('currentInstrumentTitle').textContent = inst;
+          renderInstrumentCards();
+          renderTimeline();
+        };
+
+        card.innerHTML = `
+          <div class="flex justify-between items-start mb-3">
+            <span class="p-2.5 rounded-xl ${isSelected ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-700'}">
+              <i data-lucide="activity" class="w-5 h-5"></i>
+            </span>
+            <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold ${
+              currentBooking ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800'
+            }">
+              <span class="w-2 h-2 rounded-full ${currentBooking ? 'bg-amber-500' : 'bg-emerald-500'}"></span>
+              ${currentBooking ? 'In Uso Ora' : 'Disponibile'}
+            </span>
+          </div>
+
+          <h3 class="font-bold text-slate-900 text-base mb-1">${inst}</h3>
+          <p class="text-xs text-slate-500 mb-4">
+            ${currentBooking ? `In uso da: <strong class="text-slate-700">${currentBooking.user}</strong>` : 'Nessuna prenotazione attiva in questo momento'}
+          </p>
+
+          <button class="w-full py-2 rounded-lg text-xs font-semibold ${
+            isSelected ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+          } transition flex items-center justify-center gap-1.5">
+            <i data-lucide="calendar" class="w-3.5 h-3.5"></i> ${isSelected ? 'Calendario Attivo' : 'Apri Calendario'}
+          </button>
+        `;
+
+        container.appendChild(card);
+      });
+
+      lucide.createIcons();
+    }
+
+    // -------------------------------------------------------------
+    // TIMELINE FASCE ORARIE
+    // -------------------------------------------------------------
+    function renderTimeline() {
+      const container = document.getElementById('timelineSlots');
+      container.innerHTML = '';
+
+      const dateStr = document.getElementById('selectedDate').value;
+      const hours = Array.from({ length: 12 }, (_, i) => i + 8);
+
+      hours.forEach(hour => {
+        const timeFormatted = `${String(hour).padStart(2, '0')}:00`;
+        const timeNextFormatted = `${String(hour + 1).padStart(2, '0')}:00`;
+
+        const booking = bookings.find(b => {
+          if (b.instrument !== selectedInstrument || b.date !== dateStr) return false;
+          const [sH] = b.startTime.split(':').map(Number);
+          const [eH] = b.endTime.split(':').map(Number);
+          return hour >= sH && hour < eH;
+        });
+
+        const slot = document.createElement('div');
+        if (booking) {
+          slot.className = "p-3 rounded-xl border bg-amber-50 border-amber-200 text-amber-900 flex flex-col justify-between h-20 shadow-sm";
+          slot.innerHTML = `
+            <div class="flex justify-between items-center text-xs font-bold">
+              <span>${timeFormatted}</span>
+              <span class="text-[10px] bg-amber-200/60 px-1.5 py-0.5 rounded">Occupato</span>
+            </div>
+            <div class="truncate text-xs font-medium mt-1">
+              <i data-lucide="user" class="w-3 h-3 inline mr-1"></i>${booking.user}
+            </div>
+          `;
+        } else {
+          slot.className = "p-3 rounded-xl border bg-emerald-50/50 border-emerald-200/70 text-emerald-900 hover:bg-emerald-100/70 cursor-pointer transition flex flex-col justify-between h-20 shadow-sm";
+          slot.onclick = () => openBookingModal(timeFormatted, timeNextFormatted);
+          slot.innerHTML = `
+            <div class="flex justify-between items-center text-xs font-bold text-emerald-800">
+              <span>${timeFormatted}</span>
+              <span class="text-[10px] bg-emerald-200/60 px-1.5 py-0.5 rounded">Libero</span>
+            </div>
+            <div class="text-[11px] text-emerald-700 flex items-center gap-1 font-medium mt-1">
+              <i data-lucide="plus" class="w-3 h-3"></i> Prenota
+            </div>
+          `;
+        }
+
+        container.appendChild(slot);
+      });
+
+      lucide.createIcons();
+    }
+
+    // -------------------------------------------------------------
+    // SALVATAGGIO PRENOTAZIONE & CONTROLLO SOVRAPPOSIZIONI
+    // -------------------------------------------------------------
+    function openBookingModal(startTime = "09:00", endTime = "10:00") {
+      document.getElementById('modalInstrument').value = selectedInstrument;
+      document.getElementById('modalUser').value = currentUser ? currentUser.email : '';
+      document.getElementById('modalDate').value = document.getElementById('selectedDate').value;
+      document.getElementById('modalStartTime').value = startTime;
+      document.getElementById('modalEndTime').value = endTime;
+
+      document.getElementById('bookingModal').classList.remove('hidden');
+    }
+
+    function closeBookingModal() {
+      document.getElementById('bookingModal').classList.add('hidden');
+    }
+
+    function saveBooking(e) {
+      e.preventDefault();
+
+      const inst = document.getElementById('modalInstrument').value;
+      const user = document.getElementById('modalUser').value;
+      const date = document.getElementById('modalDate').value;
+      const startTime = document.getElementById('modalStartTime').value;
+      const endTime = document.getElementById('modalEndTime').value;
+
+      if (startTime >= endTime) {
+        showAlert('error', 'Orario Errato', 'L\'ora di fine deve essere dopo l\'ora di inizio.');
+        return;
+      }
+
+      // CONTROLLO SOVRAPPOSIZIONI ORARIE
+      const conflict = checkConflict(inst, date, startTime, endTime);
+
+      if (conflict) {
+        showAlert(
+          'error', 
+          'Strumento Occupato!', 
+          `Lo strumento <strong>${inst}</strong> è già stato prenotato da <strong>${conflict.user}</strong> per il giorno ${date} nella fascia ${conflict.startTime} - ${conflict.endTime}.`
+        );
+        return;
+      }
+
+      const newBooking = {
+        id: Date.now().toString(),
+        instrument: inst,
+        user: user,
+        date: date,
+        startTime: startTime,
+        endTime: endTime
+      };
+
+      bookings.push(newBooking);
+      localStorage.setItem('lab_bookings', JSON.stringify(bookings));
+
+      if (isCloudEnabled && db) {
+        db.collection("bookings").add(newBooking);
+      }
+
+      closeBookingModal();
+      refreshUI();
+      showAlert('success', 'Prenotazione Effettuata', `Prenotazione registrata per ${inst} il ${date}.`);
+    }
+
+    function checkConflict(instrument, date, start, end) {
+      const [newStartH, newStartM] = start.split(':').map(Number);
+      const [newEndH, newEndM] = end.split(':').map(Number);
+      const newStartMins = newStartH * 60 + newStartM;
+      const newEndMins = newEndH * 60 + newEndM;
+
+      return bookings.find(b => {
+        if (b.instrument !== instrument || b.date !== date) return false;
+
+        const [bStartH, bStartM] = b.startTime.split(':').map(Number);
+        const [bEndH, bEndM] = b.endTime.split(':').map(Number);
+        const bStartMins = bStartH * 60 + bStartM;
+        const bEndMins = bEndH * 60 + bEndM;
+
+        return Math.max(newStartMins, bStartMins) < Math.min(newEndMins, bEndMins);
+      });
+    }
+
+    function deleteBooking(id) {
+      if (!confirm("Confermi di voler eliminare questa prenotazione?")) return;
+
+      bookings = bookings.filter(b => b.id !== id);
+      localStorage.setItem('lab_bookings', JSON.stringify(bookings));
+
+      if (isCloudEnabled && db) {
+        db.collection("bookings").doc(id).delete();
+      }
+
+      refreshUI();
+      showAlert('info', 'Cancellato', 'La prenotazione è stata rimossa.');
+    }
+
+    // -------------------------------------------------------------
+    // REGISTRO TABELLA
+    // -------------------------------------------------------------
+    function renderBookingList() {
+      const tbody = document.getElementById('bookingsTableBody');
+      const search = document.getElementById('searchInput').value.toLowerCase();
+      tbody.innerHTML = '';
+
+      const filtered = bookings.filter(b => 
+        b.user.toLowerCase().includes(search) || 
+        b.date.includes(search) || 
+        b.instrument.toLowerCase().includes(search)
+      ).sort((a,b) => new Date(b.date + 'T' + b.startTime) - new Date(a.date + 'T' + a.startTime));
+
+      if (filtered.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="5" class="p-6 text-center text-slate-400 text-xs">Nessuna prenotazione presente.</td></tr>`;
+        return;
+      }
+
+      filtered.forEach(b => {
+        const tr = document.createElement('tr');
+        tr.className = "hover:bg-slate-50 transition border-b border-slate-100 text-xs";
+
+        const isOwner = currentUser && (currentUser.email === b.user || currentUser.email.toLowerCase() === ADMIN_EMAIL.toLowerCase());
+
+        tr.innerHTML = `
+          <td class="p-3 font-semibold text-slate-800">${b.instrument}</td>
+          <td class="p-3 text-slate-600">${b.user}</td>
+          <td class="p-3 text-slate-600">${b.date}</td>
+          <td class="p-3 font-medium text-slate-700">${b.startTime} - ${b.endTime}</td>
+          <td class="p-3 text-right">
+            ${isOwner ? `
+              <button onclick="deleteBooking('${b.id}')" class="text-red-500 hover:text-red-700 font-medium text-xs">Annulla</button>
+            ` : '<span class="text-slate-300">-</span>'}
+          </td>
+        `;
+
+        tbody.appendChild(tr);
+      });
+    }
+
+    // -------------------------------------------------------------
+    // BANNER NOTIFICHE IN SOVRIMPORSIONE (z-[100])
+    // -------------------------------------------------------------
+    function showAlert(type, title, message) {
+      const banner = document.getElementById('alertBanner');
+      const alertTitle = document.getElementById('alertTitle');
+      const alertMessage = document.getElementById('alertMessage');
+      const alertIcon = document.getElementById('alertIcon');
+
+      alertTitle.textContent = title;
+      alertMessage.innerHTML = message;
+
+      if (type === 'error') {
+        banner.className = "fixed top-5 left-1/2 -translate-x-1/2 z-[100] w-11/12 max-w-xl p-4 rounded-xl shadow-2xl flex items-start gap-3 border bg-red-50 border-red-300 text-red-900";
+        alertIcon.setAttribute('data-lucide', 'alert-octagon');
+      } else if (type === 'success') {
+        banner.className = "fixed top-5 left-1/2 -translate-x-1/2 z-[100] w-11/12 max-w-xl p-4 rounded-xl shadow-2xl flex items-start gap-3 border bg-emerald-50 border-emerald-300 text-emerald-900";
+        alertIcon.setAttribute('data-lucide', 'check-circle-2');
+      } else {
+        banner.className = "fixed top-5 left-1/2 -translate-x-1/2 z-[100] w-11/12 max-w-xl p-4 rounded-xl shadow-2xl flex items-start gap-3 border bg-blue-50 border-blue-300 text-blue-900";
+        alertIcon.setAttribute('data-lucide', 'info');
+      }
+
+      lucide.createIcons();
+      banner.classList.remove('hidden');
+
+      setTimeout(() => {
+        hideAlert();
+      }, 6000);
+    }
+
+    function hideAlert() {
+      document.getElementById('alertBanner').classList.add('hidden');
+    }
+  </script>
+</body>
+</html>
