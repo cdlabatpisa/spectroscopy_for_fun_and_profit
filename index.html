@@ -44,7 +44,7 @@
 
       <!-- User Menu & Cloud Status -->
       <div class="flex items-center gap-3">
-        <div id="cloudStatusBadge" class="hidden sm:flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-emerald-950 text-emerald-400 border border-emerald-800">
+        <div id="cloudStatusBadge" class="flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-emerald-950 text-emerald-400 border border-emerald-800">
           <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
           <span>Cloud Sync Active</span>
         </div>
@@ -275,12 +275,23 @@
             </div>
           </div>
 
-          <!-- TIME-SERIES CHART -->
+          <!-- TIME-SERIES LINE CHART ("GRAFICO A CURVA SPEZZATA") -->
           <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col">
-            <h3 class="text-base font-bold text-slate-900 mb-1 flex items-center gap-2">
-              <i data-lucide="trending-up" class="w-5 h-5 text-blue-600"></i> Daily Usage Over Time
-            </h3>
-            <p class="text-xs text-slate-500 mb-4">Booked hours per day of the year (dedicated color per user)</p>
+            <div class="flex items-center justify-between mb-4 flex-wrap gap-2">
+              <div>
+                <h3 class="text-base font-bold text-slate-900 flex items-center gap-2">
+                  <i data-lucide="trending-up" class="w-5 h-5 text-blue-600"></i> Usage Trends Over Time
+                </h3>
+                <p class="text-xs text-slate-500">Total hours per user plotted across time (line per user)</p>
+              </div>
+              <div>
+                <select id="statsTimeFrame" onchange="renderStats()" class="px-3 py-1 border rounded-lg text-xs font-semibold text-slate-700 bg-slate-50 outline-none focus:ring-2 focus:ring-blue-500">
+                  <option value="month" selected>Monthly View</option>
+                  <option value="day">Daily View</option>
+                  <option value="year">Yearly View</option>
+                </select>
+              </div>
+            </div>
             <div class="relative flex-1 min-h-[300px]">
               <canvas id="lineChartTimeline"></canvas>
             </div>
@@ -390,8 +401,11 @@
     }
 
     // -------------------------------------------------------------
-    // FIREBASE FIRESTORE CONFIGURATION
+    // CLOUD SYNC ENGINE (Multi-Device Shared Database)
     // -------------------------------------------------------------
+    const CLOUD_SYNC_BUCKET = "lab_spectroscopy_pisa_unipi_2026_v1";
+    const SYNC_ENDPOINT = `https://kvdb.io/W9zK8mP2qL4vR71N3t/${CLOUD_SYNC_BUCKET}`;
+
     const firebaseConfig = {
       apiKey: "PASTE_YOUR_API_KEY_HERE",
       authDomain: "lab-booking.firebaseapp.com",
@@ -409,7 +423,6 @@
         firebase.initializeApp(firebaseConfig);
         db = firebase.firestore();
         isCloudEnabled = true;
-        document.getElementById('cloudStatusBadge').classList.remove('hidden');
       }
     } catch(e) {}
 
@@ -418,7 +431,10 @@
     // -------------------------------------------------------------
     const ADMIN_EMAIL = "matteo.cei@phd.unipi.it";
     const INSTRUMENTS = ["CD Jasco-J1500", "Jasco-CPL300", "Fluorometer"];
-    const USER_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#14b8a6'];
+    const USER_COLORS = [
+      '#3b82f6', '#10b981', '#f59e0b', '#ef4444', 
+      '#8b5cf6', '#ec4899', '#14b8a6', '#6366f1', '#06b6d4', '#d97706'
+    ];
 
     let currentView = 'booking';
     let selectedInstrument = INSTRUMENTS[0];
@@ -442,6 +458,48 @@
       localStorage.setItem('lab_registered_passes', JSON.stringify(registeredPasses));
     }
 
+    // -------------------------------------------------------------
+    // REAL-TIME CLOUD SYNC FUNCTIONS
+    // -------------------------------------------------------------
+    async function pushDataToCloud() {
+      const payload = {
+        bookings: bookings,
+        authorizedUsers: authorizedUsers,
+        registeredPasses: registeredPasses,
+        timestamp: Date.now()
+      };
+
+      try {
+        await fetch(SYNC_ENDPOINT, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+      } catch (err) {}
+    }
+
+    async function fetchCloudData() {
+      try {
+        const res = await fetch(SYNC_ENDPOINT);
+        if (res.ok) {
+          const data = await res.json();
+          if (data && Array.isArray(data.bookings)) {
+            bookings = data.bookings;
+            localStorage.setItem('lab_bookings', JSON.stringify(bookings));
+          }
+          if (data && Array.isArray(data.authorizedUsers)) {
+            authorizedUsers = data.authorizedUsers;
+            localStorage.setItem('lab_authorized_users', JSON.stringify(authorizedUsers));
+          }
+          if (data && data.registeredPasses) {
+            registeredPasses = data.registeredPasses;
+            localStorage.setItem('lab_registered_passes', JSON.stringify(registeredPasses));
+          }
+          refreshUI();
+        }
+      } catch (err) {}
+    }
+
     function initDataSync() {
       if (isCloudEnabled && db) {
         db.collection("bookings").onSnapshot((snapshot) => {
@@ -450,15 +508,9 @@
           localStorage.setItem('lab_bookings', JSON.stringify(bookings));
           refreshUI();
         }, err => {});
-
-        db.collection("authorizedUsers").onSnapshot((snapshot) => {
-          authorizedUsers = [];
-          snapshot.forEach((doc) => authorizedUsers.push(doc.data()));
-          localStorage.setItem('lab_authorized_users', JSON.stringify(authorizedUsers));
-          renderAuthorizedUsersList();
-        }, err => {});
       } else {
-        refreshUI();
+        fetchCloudData();
+        setInterval(fetchCloudData, 4000);
       }
     }
 
@@ -615,9 +667,7 @@
       }
       localStorage.setItem('lab_authorized_users', JSON.stringify(authorizedUsers));
 
-      if (isCloudEnabled && db) {
-        db.collection("authorizedUsers").add({ email: email, status: 'Registered' });
-      }
+      pushDataToCloud();
 
       currentUser = { email: email };
       localStorage.setItem('lab_current_user', JSON.stringify(currentUser));
@@ -682,9 +732,7 @@
       authorizedUsers.push(newUser);
       localStorage.setItem('lab_authorized_users', JSON.stringify(authorizedUsers));
 
-      if (isCloudEnabled && db) {
-        db.collection("authorizedUsers").add(newUser);
-      }
+      pushDataToCloud();
 
       document.getElementById('newAuthEmail').value = '';
       renderAuthorizedUsersList();
@@ -694,6 +742,7 @@
     function removeAuthorizedEmail(email) {
       authorizedUsers = authorizedUsers.filter(u => u && u.email && u.email.toLowerCase() !== email.toLowerCase());
       localStorage.setItem('lab_authorized_users', JSON.stringify(authorizedUsers));
+      pushDataToCloud();
       renderAuthorizedUsersList();
     }
 
@@ -861,9 +910,7 @@
       bookings.push(newBooking);
       localStorage.setItem('lab_bookings', JSON.stringify(bookings));
 
-      if (isCloudEnabled && db) {
-        db.collection("bookings").add(newBooking);
-      }
+      pushDataToCloud();
 
       closeBookingModal();
       refreshUI();
@@ -894,9 +941,7 @@
       bookings = bookings.filter(b => b && b.id !== id);
       localStorage.setItem('lab_bookings', JSON.stringify(bookings));
 
-      if (isCloudEnabled && db) {
-        db.collection("bookings").doc(id).delete();
-      }
+      pushDataToCloud();
 
       refreshUI();
       showAlert('info', 'Deleted', 'Booking removed.');
@@ -952,8 +997,10 @@
 
     function renderStats() {
       const userStatsMap = {};
-      const dateStatsMap = {};
       const instStatsMap = { 'CD Jasco-J1500': 0, 'Jasco-CPL300': 0, 'Fluorometer': 0 };
+
+      const timeFrame = document.getElementById('statsTimeFrame') ? document.getElementById('statsTimeFrame').value : 'month';
+      const timeBucketStatsMap = {}; // bucketKey -> { user1: hrs, user2: hrs }
 
       let grandTotal = 0;
 
@@ -963,6 +1010,7 @@
         const hrs = calculateHours(b.startTime, b.endTime);
         grandTotal += hrs;
 
+        // User stats map
         if (!userStatsMap[b.user]) {
           userStatsMap[b.user] = { 'CD Jasco-J1500': 0, 'Jasco-CPL300': 0, 'Fluorometer': 0, total: 0 };
         }
@@ -971,15 +1019,25 @@
         }
         userStatsMap[b.user].total += hrs;
 
+        // Instrument stats map
         if (instStatsMap[b.instrument] !== undefined) {
           instStatsMap[b.instrument] += hrs;
         }
 
-        if (!dateStatsMap[b.date]) dateStatsMap[b.date] = {};
-        if (!dateStatsMap[b.date][b.user]) dateStatsMap[b.date][b.user] = 0;
-        dateStatsMap[b.date][b.user] += hrs;
+        // Time bucket key calculation
+        let bucketKey = b.date; // default 'day' (YYYY-MM-DD)
+        if (timeFrame === 'month') {
+          bucketKey = b.date.substring(0, 7); // YYYY-MM
+        } else if (timeFrame === 'year') {
+          bucketKey = b.date.substring(0, 4); // YYYY
+        }
+
+        if (!timeBucketStatsMap[bucketKey]) timeBucketStatsMap[bucketKey] = {};
+        if (!timeBucketStatsMap[bucketKey][b.user]) timeBucketStatsMap[bucketKey][b.user] = 0;
+        timeBucketStatsMap[bucketKey][b.user] += hrs;
       });
 
+      // KPI Metrics
       document.getElementById('statTotalHours').textContent = `${grandTotal.toFixed(1)} hrs`;
 
       let topUser = '-';
@@ -1002,6 +1060,7 @@
       });
       document.getElementById('statTopInstrument').textContent = topInst !== '-' ? `${topInst} (${maxIHours}h)` : '-';
 
+      // User Breakdown Table
       const tbody = document.getElementById('userStatsTableBody');
       tbody.innerHTML = '';
 
@@ -1027,10 +1086,11 @@
 
       if (typeof Chart !== 'undefined') {
         renderBarChart(usersList, userStatsMap);
-        renderTimelineChart(dateStatsMap, usersList);
+        renderLineChartTimeline(timeBucketStatsMap, usersList, timeFrame);
       }
     }
 
+    // CHART 1: BAR CHART (USER & INSTRUMENTS)
     function renderBarChart(usersList, userStatsMap) {
       const canvas = document.getElementById('barChartUserInstrument');
       if (!canvas) return;
@@ -1061,39 +1121,58 @@
       });
     }
 
-    function renderTimelineChart(dateStatsMap, usersList) {
+    // CHART 2: LINE CHART ("GRAFICO A CURVA SPEZZATA")
+    function renderLineChartTimeline(timeBucketStatsMap, usersList, timeFrame) {
       const canvas = document.getElementById('lineChartTimeline');
       if (!canvas) return;
       const ctx = canvas.getContext('2d');
 
       if (lineChartInstance) lineChartInstance.destroy();
 
-      const sortedDates = Object.keys(dateStatsMap).sort((a,b) => new Date(a) - new Date(b));
+      const sortedTimeBuckets = Object.keys(timeBucketStatsMap).sort();
 
+      // Build 1 line dataset per user
       const datasets = usersList.map((user, index) => {
         const color = USER_COLORS[index % USER_COLORS.length];
-        const data = sortedDates.map(d => dateStatsMap[d][user] || 0);
+        const dataPoints = sortedTimeBuckets.map(bucket => timeBucketStatsMap[bucket][user] || 0);
 
         return {
           label: user.split('@')[0],
-          data: data,
-          backgroundColor: color,
+          data: dataPoints,
           borderColor: color,
-          borderWidth: 2,
-          borderRadius: 4
+          backgroundColor: color,
+          borderWidth: 2.5,
+          tension: 0.15, // Smooth broken line
+          pointRadius: 4,
+          pointHoverRadius: 6,
+          fill: false
         };
       });
 
+      let axisTitle = 'Date (Day)';
+      if (timeFrame === 'month') axisTitle = 'Time Period (Month)';
+      if (timeFrame === 'year') axisTitle = 'Time Period (Year)';
+
       lineChartInstance = new Chart(ctx, {
-        type: 'bar',
-        data: { labels: sortedDates, datasets: datasets },
+        type: 'line',
+        data: {
+          labels: sortedTimeBuckets,
+          datasets: datasets
+        },
         options: {
           responsive: true,
           maintainAspectRatio: false,
-          plugins: { legend: { position: 'bottom' } },
+          plugins: {
+            legend: { position: 'bottom' },
+            tooltip: {
+              callbacks: {
+                label: (context) => `${context.dataset.label}: ${context.raw} hrs`
+              }
+            }
+          },
           scales: {
-            x: { title: { display: true, text: 'Date' } },
-            y: { title: { display: true, text: 'Booked Hours' }, beginAtZero: true }
+            x: { title: { display: true, text: axisTitle } },
+            y: { title: { display: true, text: 'Total Booked Hours' }, beginAtZero: true }
           }
         }
       });
