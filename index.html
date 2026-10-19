@@ -257,4 +257,904 @@
                   <th class="p-3">Utente / Ricercatore</th>
                   <th class="p-3 text-center">CD Jasco-J1500</th>
                   <th class="p-3 text-center">Jasco-CPL300</th>
-                  <th class="p-3
+                  <th class="p-3 text-center">Fluorimetro</th>
+                  <th class="p-3 text-right font-bold">Totale Ore</th>
+                </tr>
+              </thead>
+              <tbody id="userStatsTableBody" class="divide-y divide-slate-100">
+                <!-- Righe conteggio utenti caricate via JS -->
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <!-- GRAFICI -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          
+          <!-- ISTOGRAMMA CARINO (Bar Chart) -->
+          <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col">
+            <h3 class="text-base font-bold text-slate-900 mb-1 flex items-center gap-2">
+              <i data-lucide="bar-chart-2" class="w-5 h-5 text-blue-600"></i> Ore Totali per Utente e Strumento
+            </h3>
+            <p class="text-xs text-slate-500 mb-4">Istogramma comparativo dell'utilizzo dei macchinari</p>
+            <div class="relative flex-1 min-h-[300px]">
+              <canvas id="barChartUserInstrument"></canvas>
+            </div>
+          </div>
+
+          <!-- GRAFICO TEMPORALE ORE / GIORNI -->
+          <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col">
+            <h3 class="text-base font-bold text-slate-900 mb-1 flex items-center gap-2">
+              <i data-lucide="trending-up" class="w-5 h-5 text-blue-600"></i> Utilizzo Giornaliero nel Tempo
+            </h3>
+            <p class="text-xs text-slate-500 mb-4">Ore prenotate per giorno dell'anno (colore dedicato per ogni utente)</p>
+            <div class="relative flex-1 min-h-[300px]">
+              <canvas id="lineChartTimeline"></canvas>
+            </div>
+          </div>
+
+        </div>
+
+      </div>
+
+    </div>
+  </main>
+
+  <!-- MODALE MODULO PRENOTAZIONE -->
+  <div id="bookingModal" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl shadow-2xl max-w-md w-full overflow-hidden border border-slate-100">
+      <div class="bg-slate-900 p-4 text-white flex justify-between items-center">
+        <h3 class="font-bold text-base flex items-center gap-2">
+          <i data-lucide="calendar-plus" class="w-5 h-5 text-blue-400"></i> Prenota Strumento
+        </h3>
+        <button onclick="closeBookingModal()" class="text-slate-400 hover:text-white">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <form id="bookingForm" onsubmit="saveBooking(event)" class="p-6 space-y-4">
+        <div>
+          <label class="block text-xs font-semibold text-slate-700 mb-1">Strumento</label>
+          <select id="modalInstrument" class="w-full px-3 py-2 border rounded-lg text-sm bg-white focus:ring-2 focus:ring-blue-500 outline-none">
+            <option value="CD Jasco-J1500">CD Jasco-J1500</option>
+            <option value="Jasco-CPL300">Jasco-CPL300</option>
+            <option value="Fluorimetro">Fluorimetro</option>
+          </select>
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-700 mb-1">Nome Utente</label>
+          <input type="text" id="modalUser" readonly class="w-full px-3 py-2 border rounded-lg text-sm bg-slate-100 text-slate-600 font-medium outline-none cursor-not-allowed">
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-700 mb-1">Data Prenotazione</label>
+          <input type="date" id="modalDate" required class="w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none">
+        </div>
+
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">Ora Inizio</label>
+            <input type="time" id="modalStartTime" required step="1800" class="w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none">
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">Ora Fine</label>
+            <input type="time" id="modalEndTime" required step="1800" class="w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none">
+          </div>
+        </div>
+
+        <div class="pt-4 flex items-center justify-end gap-3 border-t border-slate-100">
+          <button type="button" onclick="closeBookingModal()" class="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-lg">Annulla</button>
+          <button type="submit" class="px-5 py-2 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-sm">Conferma Prenotazione</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODALE PANNELLO ADMIN -->
+  <div id="adminModal" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl shadow-2xl max-w-lg w-full overflow-hidden border border-slate-100">
+      <div class="bg-slate-900 p-4 text-white flex justify-between items-center">
+        <h3 class="font-bold text-base flex items-center gap-2">
+          <i data-lucide="shield" class="w-5 h-5 text-amber-400"></i> Gestione Utenti Autorizzati (Admin)
+        </h3>
+        <button onclick="closeAdminModal()" class="text-slate-400 hover:text-white">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <div class="p-6 space-y-6">
+        <form onsubmit="addAuthorizedEmail(event)" class="flex gap-2">
+          <input type="email" id="newAuthEmail" required placeholder="nuovo.ricercatore@phd.unipi.it" class="flex-1 px-3 py-2 border rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500">
+          <button type="submit" class="bg-emerald-600 hover:bg-emerald-700 text-white font-medium px-4 py-2 rounded-lg text-sm transition">Autorizza Email</button>
+        </form>
+
+        <div>
+          <h4 class="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Lista Email Abilitate</h4>
+          <div class="max-h-56 overflow-y-auto border border-slate-100 rounded-xl divide-y" id="authorizedListContainer">
+            <!-- Popolato via JS -->
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- JAVASCRIPT LOGIC SICURO ED AUTOGUARINTE -->
+  <script>
+    // -------------------------------------------------------------
+    // HELPERS SICURI
+    // -------------------------------------------------------------
+    function getStorageItem(key, fallback) {
+      try {
+        const val = localStorage.getItem(key);
+        return val ? JSON.parse(val) : fallback;
+      } catch (e) {
+        console.warn("Errore lettura localStorage:", key, e);
+        return fallback;
+      }
+    }
+
+    function safeCreateIcons() {
+      if (typeof lucide !== 'undefined' && lucide && typeof lucide.createIcons === 'function') {
+        try { lucide.createIcons(); } catch(e) { console.warn("Lucide Error:", e); }
+      }
+    }
+
+    function resetSystemData() {
+      if (confirm("Vuoi resettare i dati salvati in locale per ripristinare il corretto funzionamento?")) {
+        localStorage.clear();
+        location.reload();
+      }
+    }
+
+    // -------------------------------------------------------------
+    // CONFIGURAZIONE FIREBASE FIRESTORE
+    // -------------------------------------------------------------
+    const firebaseConfig = {
+      apiKey: "PASTE_YOUR_API_KEY_HERE",
+      authDomain: "lab-booking.firebaseapp.com",
+      projectId: "lab-booking",
+      storageBucket: "lab-booking.appspot.com",
+      messagingSenderId: "123456789",
+      appId: "1:123456789:web:abcdef"
+    };
+
+    let db = null;
+    let isCloudEnabled = false;
+
+    try {
+      if (firebaseConfig.apiKey && firebaseConfig.apiKey !== "PASTE_YOUR_API_KEY_HERE") {
+        firebase.initializeApp(firebaseConfig);
+        db = firebase.firestore();
+        isCloudEnabled = true;
+        document.getElementById('cloudStatusBadge').classList.remove('hidden');
+      }
+    } catch(e) {
+      console.log("Firebase non configurato. Uso modalità locale.");
+    }
+
+    // -------------------------------------------------------------
+    // COSTANTI E STATO
+    // -------------------------------------------------------------
+    const ADMIN_EMAIL = "matteo.cei@phd.unipi.it";
+    const INSTRUMENTS = ["CD Jasco-J1500", "Jasco-CPL300", "Fluorimetro"];
+    const USER_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#14b8a6'];
+
+    let currentView = 'booking';
+    let selectedInstrument = INSTRUMENTS[0];
+    let currentUser = getStorageItem('lab_current_user', null);
+    let bookings = getStorageItem('lab_bookings', []);
+
+    let barChartInstance = null;
+    let lineChartInstance = null;
+
+    // INIZIALIZZAZIONE SICURA ADMIN E PASSWORD
+    let authorizedUsers = getStorageItem('lab_authorized_users', []);
+    if (!Array.isArray(authorizedUsers)) authorizedUsers = [];
+    if (!authorizedUsers.some(u => u && u.email && u.email.toLowerCase() === ADMIN_EMAIL.toLowerCase())) {
+      authorizedUsers.push({ email: ADMIN_EMAIL, status: 'Registered' });
+      localStorage.setItem('lab_authorized_users', JSON.stringify(authorizedUsers));
+    }
+
+    let registeredPasses = getStorageItem('lab_registered_passes', {});
+    if (typeof registeredPasses !== 'object' || registeredPasses === null) registeredPasses = {};
+    if (!registeredPasses[ADMIN_EMAIL.toLowerCase()]) {
+      registeredPasses[ADMIN_EMAIL.toLowerCase()] = "admin123";
+      localStorage.setItem('lab_registered_passes', JSON.stringify(registeredPasses));
+    }
+
+    // -------------------------------------------------------------
+    // SINCRONIZZAZIONE
+    // -------------------------------------------------------------
+    function initDataSync() {
+      if (isCloudEnabled && db) {
+        db.collection("bookings").onSnapshot((snapshot) => {
+          bookings = [];
+          snapshot.forEach((doc) => bookings.push({ id: doc.id, ...doc.data() }));
+          localStorage.setItem('lab_bookings', JSON.stringify(bookings));
+          refreshUI();
+        }, err => console.warn("Sync err:", err));
+
+        db.collection("authorizedUsers").onSnapshot((snapshot) => {
+          authorizedUsers = [];
+          snapshot.forEach((doc) => authorizedUsers.push(doc.data()));
+          localStorage.setItem('lab_authorized_users', JSON.stringify(authorizedUsers));
+          renderAuthorizedUsersList();
+        }, err => console.warn("Sync err:", err));
+      } else {
+        refreshUI();
+      }
+    }
+
+    document.addEventListener("DOMContentLoaded", () => {
+      safeCreateIcons();
+      const dateElem = document.getElementById('selectedDate');
+      if (dateElem) dateElem.value = new Date().toISOString().split('T')[0];
+      
+      checkAuthStatus();
+      initDataSync();
+    });
+
+    function refreshUI() {
+      try {
+        renderInstrumentCards();
+        renderTimeline();
+        renderBookingList();
+        if (currentView === 'stats') {
+          renderStats();
+        }
+      } catch (err) {
+        console.error("Errore durante l'aggiornamento UI:", err);
+      }
+    }
+
+    function switchView(view) {
+      currentView = view;
+      const viewBooking = document.getElementById('viewBooking');
+      const viewStats = document.getElementById('viewStats');
+      const btnBooking = document.getElementById('navBtnBooking');
+      const btnStats = document.getElementById('navBtnStats');
+
+      if (view === 'booking') {
+        viewBooking.classList.remove('hidden');
+        viewStats.classList.add('hidden');
+        btnBooking.className = "px-4 py-2 rounded-xl text-sm font-bold bg-blue-600 text-white shadow-sm flex items-center gap-2 transition";
+        btnStats.className = "px-4 py-2 rounded-xl text-sm font-bold bg-white text-slate-600 hover:bg-slate-100 border border-slate-200 flex items-center gap-2 transition";
+      } else {
+        viewBooking.classList.add('hidden');
+        viewStats.classList.remove('hidden');
+        btnStats.className = "px-4 py-2 rounded-xl text-sm font-bold bg-blue-600 text-white shadow-sm flex items-center gap-2 transition";
+        btnBooking.className = "px-4 py-2 rounded-xl text-sm font-bold bg-white text-slate-600 hover:bg-slate-100 border border-slate-200 flex items-center gap-2 transition";
+        renderStats();
+      }
+    }
+
+    // -------------------------------------------------------------
+    // AUTENTICAZIONE
+    // -------------------------------------------------------------
+    function checkAuthStatus() {
+      try {
+        const authSection = document.getElementById('authSection');
+        const appDashboard = document.getElementById('appDashboard');
+        const userInfoHeader = document.getElementById('userInfoHeader');
+        const adminPanelBtn = document.getElementById('adminPanelBtn');
+
+        if (currentUser && currentUser.email) {
+          authSection.classList.add('hidden');
+          appDashboard.classList.remove('hidden');
+          userInfoHeader.classList.remove('hidden');
+          userInfoHeader.classList.add('flex');
+
+          document.getElementById('userEmailDisplay').textContent = currentUser.email;
+
+          if (currentUser.email.toLowerCase() === ADMIN_EMAIL.toLowerCase()) {
+            adminPanelBtn.classList.remove('hidden');
+            document.getElementById('userRoleBadge').textContent = "Admin";
+          } else {
+            adminPanelBtn.classList.add('hidden');
+            document.getElementById('userRoleBadge').textContent = "Utente";
+          }
+
+          refreshUI();
+        } else {
+          authSection.classList.remove('hidden');
+          appDashboard.classList.add('hidden');
+          userInfoHeader.classList.add('hidden');
+        }
+      } catch (e) {
+        console.error("Errore checkAuthStatus:", e);
+      }
+    }
+
+    function switchAuthTab(tab) {
+      const loginForm = document.getElementById('loginForm');
+      const registerForm = document.getElementById('registerForm');
+      const tabLogin = document.getElementById('tabLogin');
+      const tabRegister = document.getElementById('tabRegister');
+
+      if (tab === 'login') {
+        loginForm.classList.remove('hidden');
+        registerForm.classList.add('hidden');
+        tabLogin.className = "flex-1 py-2 text-center font-semibold text-blue-600 border-b-2 border-blue-600";
+        tabRegister.className = "flex-1 py-2 text-center font-semibold text-slate-400 border-b-2 border-transparent";
+      } else {
+        loginForm.classList.add('hidden');
+        registerForm.classList.remove('hidden');
+        tabRegister.className = "flex-1 py-2 text-center font-semibold text-blue-600 border-b-2 border-blue-600";
+        tabLogin.className = "flex-1 py-2 text-center font-semibold text-slate-400 border-b-2 border-transparent";
+      }
+    }
+
+    function handleLogin(e) {
+      e.preventDefault();
+      try {
+        const email = document.getElementById('loginEmail').value.trim().toLowerCase();
+        const pass = document.getElementById('loginPassword').value;
+
+        if (registeredPasses[email] && registeredPasses[email] === pass) {
+          currentUser = { email: email };
+          localStorage.setItem('lab_current_user', JSON.stringify(currentUser));
+          checkAuthStatus();
+          showAlert('success', 'Accesso effettuato', `Benvenuto/a ${email}`);
+        } else {
+          showAlert('error', 'Credenziali errate', 'Password errata. Se è la prima volta passa a "Prima Registrazione".');
+        }
+      } catch (err) {
+        console.error("Login err:", err);
+        showAlert('error', 'Errore di Login', 'Impossibile completare il login. Clicca su reset dati in basso se persiste.');
+      }
+    }
+
+    function handleRegister(e) {
+      e.preventDefault();
+      try {
+        const email = document.getElementById('regEmail').value.trim().toLowerCase();
+        const pass = document.getElementById('regPassword').value;
+
+        const isAuthorized = authorizedUsers.some(u => u && u.email && u.email.toLowerCase() === email);
+
+        if (!isAuthorized) {
+          showAlert('error', 'Non Autorizzato', `L'email ${email} non è tra quelle abilitate dall'Admin.`);
+          return;
+        }
+
+        registeredPasses[email] = pass;
+        localStorage.setItem('lab_registered_passes', JSON.stringify(registeredPasses));
+
+        const userIndex = authorizedUsers.findIndex(u => u && u.email && u.email.toLowerCase() === email);
+        if (userIndex !== -1) {
+          authorizedUsers[userIndex].status = 'Registered';
+        } else {
+          authorizedUsers.push({ email: email, status: 'Registered' });
+        }
+        localStorage.setItem('lab_authorized_users', JSON.stringify(authorizedUsers));
+
+        currentUser = { email: email };
+        localStorage.setItem('lab_current_user', JSON.stringify(currentUser));
+        checkAuthStatus();
+        showAlert('success', 'Registrazione completata', 'Password registrata con successo!');
+      } catch(err) {
+        console.error("Register err:", err);
+      }
+    }
+
+    function logout() {
+      currentUser = null;
+      localStorage.removeItem('lab_current_user');
+      checkAuthStatus();
+    }
+
+    // -------------------------------------------------------------
+    // AMMINISTRAZIONE
+    // -------------------------------------------------------------
+    function openAdminModal() {
+      if (!currentUser || currentUser.email.toLowerCase() !== ADMIN_EMAIL.toLowerCase()) {
+        showAlert('error', 'Non Autorizzato', 'Solo l\'amministratore ha l\'accesso.');
+        return;
+      }
+      renderAuthorizedUsersList();
+      document.getElementById('adminModal').classList.remove('hidden');
+    }
+
+    function closeAdminModal() {
+      document.getElementById('adminModal').classList.add('hidden');
+    }
+
+    function renderAuthorizedUsersList() {
+      const container = document.getElementById('authorizedListContainer');
+      container.innerHTML = '';
+
+      authorizedUsers.forEach((u) => {
+        if (!u || !u.email) return;
+        const div = document.createElement('div');
+        div.className = "p-3 flex items-center justify-between text-sm";
+        div.innerHTML = `
+          <div>
+            <span class="font-medium text-slate-800">${u.email}</span>
+            <span class="ml-2 text-[10px] px-2 py-0.5 rounded ${u.status === 'Registered' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'} font-semibold">${u.status || 'Pending'}</span>
+          </div>
+          ${u.email.toLowerCase() !== ADMIN_EMAIL.toLowerCase() ? `
+            <button onclick="removeAuthorizedEmail('${u.email}')" class="text-red-500 hover:text-red-700 p-1">
+              <i data-lucide="trash-2" class="w-4 h-4"></i>
+            </button>
+          ` : '<span class="text-xs text-slate-400 font-bold">Admin</span>'}
+        `;
+        container.appendChild(div);
+      });
+      safeCreateIcons();
+    }
+
+    function addAuthorizedEmail(e) {
+      e.preventDefault();
+      const email = document.getElementById('newAuthEmail').value.trim().toLowerCase();
+
+      if (authorizedUsers.some(u => u && u.email && u.email.toLowerCase() === email)) {
+        showAlert('warning', 'Email già presente', 'L\'email è già abilitata.');
+        return;
+      }
+
+      const newUser = { email: email, status: 'Pending' };
+      authorizedUsers.push(newUser);
+      localStorage.setItem('lab_authorized_users', JSON.stringify(authorizedUsers));
+
+      if (isCloudEnabled && db) {
+        db.collection("authorizedUsers").add(newUser);
+      }
+
+      document.getElementById('newAuthEmail').value = '';
+      renderAuthorizedUsersList();
+      showAlert('success', 'Email Abilitata', `${email} può ora registrarsi.`);
+    }
+
+    function removeAuthorizedEmail(email) {
+      authorizedUsers = authorizedUsers.filter(u => u && u.email && u.email.toLowerCase() !== email.toLowerCase());
+      localStorage.setItem('lab_authorized_users', JSON.stringify(authorizedUsers));
+      renderAuthorizedUsersList();
+    }
+
+    // -------------------------------------------------------------
+    // CARDS STRUMENTI
+    // -------------------------------------------------------------
+    function renderInstrumentCards() {
+      const container = document.getElementById('instrumentCardsContainer');
+      if (!container) return;
+      container.innerHTML = '';
+
+      const now = new Date();
+      const currentDateStr = now.toISOString().split('T')[0];
+      const currentMinutes = now.getHours() * 60 + now.getMinutes();
+
+      INSTRUMENTS.forEach(inst => {
+        const currentBooking = bookings.find(b => {
+          if (!b || b.instrument !== inst || b.date !== currentDateStr || !b.startTime || !b.endTime) return false;
+          const [sH, sM] = b.startTime.split(':').map(Number);
+          const [eH, eM] = b.endTime.split(':').map(Number);
+          return currentMinutes >= (sH * 60 + sM) && currentMinutes < (eH * 60 + eM);
+        });
+
+        const isSelected = selectedInstrument === inst;
+
+        const card = document.createElement('div');
+        card.className = `p-5 rounded-2xl border transition-all cursor-pointer shadow-sm relative overflow-hidden ${
+          isSelected ? 'bg-blue-50/50 border-blue-500 ring-2 ring-blue-500/20' : 'bg-white border-slate-200 hover:border-slate-300'
+        }`;
+
+        card.onclick = () => {
+          selectedInstrument = inst;
+          document.getElementById('currentInstrumentTitle').textContent = inst;
+          renderInstrumentCards();
+          renderTimeline();
+        };
+
+        card.innerHTML = `
+          <div class="flex justify-between items-start mb-3">
+            <span class="p-2.5 rounded-xl ${isSelected ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-700'}">
+              <i data-lucide="activity" class="w-5 h-5"></i>
+            </span>
+            <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold ${
+              currentBooking ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800'
+            }">
+              <span class="w-2 h-2 rounded-full ${currentBooking ? 'bg-amber-500' : 'bg-emerald-500'}"></span>
+              ${currentBooking ? 'In Uso Ora' : 'Disponibile'}
+            </span>
+          </div>
+
+          <h3 class="font-bold text-slate-900 text-base mb-1">${inst}</h3>
+          <p class="text-xs text-slate-500 mb-4">
+            ${currentBooking ? `In uso da: <strong class="text-slate-700">${currentBooking.user}</strong>` : 'Nessuna prenotazione attiva ora'}
+          </p>
+
+          <button class="w-full py-2 rounded-lg text-xs font-semibold ${
+            isSelected ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+          } transition flex items-center justify-center gap-1.5">
+            <i data-lucide="calendar" class="w-3.5 h-3.5"></i> ${isSelected ? 'Calendario Attivo' : 'Apri Calendario'}
+          </button>
+        `;
+
+        container.appendChild(card);
+      });
+
+      safeCreateIcons();
+    }
+
+    // -------------------------------------------------------------
+    // TIMELINE
+    // -------------------------------------------------------------
+    function renderTimeline() {
+      const container = document.getElementById('timelineSlots');
+      if (!container) return;
+      container.innerHTML = '';
+
+      const dateStr = document.getElementById('selectedDate').value;
+      const hours = Array.from({ length: 12 }, (_, i) => i + 8);
+
+      hours.forEach(hour => {
+        const timeFormatted = `${String(hour).padStart(2, '0')}:00`;
+        const timeNextFormatted = `${String(hour + 1).padStart(2, '0')}:00`;
+
+        const booking = bookings.find(b => {
+          if (!b || b.instrument !== selectedInstrument || b.date !== dateStr || !b.startTime || !b.endTime) return false;
+          const [sH] = b.startTime.split(':').map(Number);
+          const [eH] = b.endTime.split(':').map(Number);
+          return hour >= sH && hour < eH;
+        });
+
+        const slot = document.createElement('div');
+        if (booking) {
+          slot.className = "p-3 rounded-xl border bg-amber-50 border-amber-200 text-amber-900 flex flex-col justify-between h-20 shadow-sm";
+          slot.innerHTML = `
+            <div class="flex justify-between items-center text-xs font-bold">
+              <span>${timeFormatted}</span>
+              <span class="text-[10px] bg-amber-200/60 px-1.5 py-0.5 rounded">Occupato</span>
+            </div>
+            <div class="truncate text-xs font-medium mt-1">
+              <i data-lucide="user" class="w-3 h-3 inline mr-1"></i>${booking.user}
+            </div>
+          `;
+        } else {
+          slot.className = "p-3 rounded-xl border bg-emerald-50/50 border-emerald-200/70 text-emerald-900 hover:bg-emerald-100/70 cursor-pointer transition flex flex-col justify-between h-20 shadow-sm";
+          slot.onclick = () => openBookingModal(timeFormatted, timeNextFormatted);
+          slot.innerHTML = `
+            <div class="flex justify-between items-center text-xs font-bold text-emerald-800">
+              <span>${timeFormatted}</span>
+              <span class="text-[10px] bg-emerald-200/60 px-1.5 py-0.5 rounded">Libero</span>
+            </div>
+            <div class="text-[11px] text-emerald-700 flex items-center gap-1 font-medium mt-1">
+              <i data-lucide="plus" class="w-3 h-3"></i> Prenota
+            </div>
+          `;
+        }
+
+        container.appendChild(slot);
+      });
+
+      safeCreateIcons();
+    }
+
+    // -------------------------------------------------------------
+    // PRENOTAZIONI
+    // -------------------------------------------------------------
+    function openBookingModal(startTime = "09:00", endTime = "10:00") {
+      document.getElementById('modalInstrument').value = selectedInstrument;
+      document.getElementById('modalUser').value = currentUser ? currentUser.email : '';
+      document.getElementById('modalDate').value = document.getElementById('selectedDate').value;
+      document.getElementById('modalStartTime').value = startTime;
+      document.getElementById('modalEndTime').value = endTime;
+
+      document.getElementById('bookingModal').classList.remove('hidden');
+    }
+
+    function closeBookingModal() {
+      document.getElementById('bookingModal').classList.add('hidden');
+    }
+
+    function saveBooking(e) {
+      e.preventDefault();
+
+      const inst = document.getElementById('modalInstrument').value;
+      const user = document.getElementById('modalUser').value;
+      const date = document.getElementById('modalDate').value;
+      const startTime = document.getElementById('modalStartTime').value;
+      const endTime = document.getElementById('modalEndTime').value;
+
+      if (startTime >= endTime) {
+        showAlert('error', 'Orario Errato', 'L\'ora di fine deve essere dopo l\'ora di inizio.');
+        return;
+      }
+
+      const conflict = checkConflict(inst, date, startTime, endTime);
+
+      if (conflict) {
+        showAlert(
+          'error', 
+          'Strumento Occupato!', 
+          `Lo strumento <strong>${inst}</strong> è già stato prenotato da <strong>${conflict.user}</strong> il ${date} (${conflict.startTime} - ${conflict.endTime}).`
+        );
+        return;
+      }
+
+      const newBooking = {
+        id: Date.now().toString(),
+        instrument: inst,
+        user: user,
+        date: date,
+        startTime: startTime,
+        endTime: endTime
+      };
+
+      bookings.push(newBooking);
+      localStorage.setItem('lab_bookings', JSON.stringify(bookings));
+
+      if (isCloudEnabled && db) {
+        db.collection("bookings").add(newBooking);
+      }
+
+      closeBookingModal();
+      refreshUI();
+      showAlert('success', 'Prenotazione Effettuata', `Prenotato ${inst} per il ${date}.`);
+    }
+
+    function checkConflict(instrument, date, start, end) {
+      const [newStartH, newStartM] = start.split(':').map(Number);
+      const [newEndH, newEndM] = end.split(':').map(Number);
+      const newStartMins = newStartH * 60 + newStartM;
+      const newEndMins = newEndH * 60 + newEndM;
+
+      return bookings.find(b => {
+        if (!b || b.instrument !== instrument || b.date !== date || !b.startTime || !b.endTime) return false;
+
+        const [bStartH, bStartM] = b.startTime.split(':').map(Number);
+        const [bEndH, bEndM] = b.endTime.split(':').map(Number);
+        const bStartMins = bStartH * 60 + bStartM;
+        const bEndMins = bEndH * 60 + bEndM;
+
+        return Math.max(newStartMins, bStartMins) < Math.min(newEndMins, bEndMins);
+      });
+    }
+
+    function deleteBooking(id) {
+      if (!confirm("Confermi di voler eliminare la prenotazione?")) return;
+
+      bookings = bookings.filter(b => b && b.id !== id);
+      localStorage.setItem('lab_bookings', JSON.stringify(bookings));
+
+      if (isCloudEnabled && db) {
+        db.collection("bookings").doc(id).delete();
+      }
+
+      refreshUI();
+      showAlert('info', 'Cancellato', 'La prenotazione è stata rimossa.');
+    }
+
+    function renderBookingList() {
+      const tbody = document.getElementById('bookingsTableBody');
+      if (!tbody) return;
+      const search = document.getElementById('searchInput').value.toLowerCase();
+      tbody.innerHTML = '';
+
+      const filtered = bookings.filter(b => 
+        b && (
+          (b.user && b.user.toLowerCase().includes(search)) || 
+          (b.date && b.date.includes(search)) || 
+          (b.instrument && b.instrument.toLowerCase().includes(search))
+        )
+      ).sort((a,b) => new Date((b.date||'') + 'T' + (b.startTime||'00:00')) - new Date((a.date||'') + 'T' + (a.startTime||'00:00')));
+
+      if (filtered.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="5" class="p-6 text-center text-slate-400 text-xs">Nessuna prenotazione trovata.</td></tr>`;
+        return;
+      }
+
+      filtered.forEach(b => {
+        const tr = document.createElement('tr');
+        tr.className = "hover:bg-slate-50 transition border-b border-slate-100 text-xs";
+
+        const isOwner = currentUser && (currentUser.email === b.user || currentUser.email.toLowerCase() === ADMIN_EMAIL.toLowerCase());
+
+        tr.innerHTML = `
+          <td class="p-3 font-semibold text-slate-800">${b.instrument}</td>
+          <td class="p-3 text-slate-600">${b.user}</td>
+          <td class="p-3 text-slate-600">${b.date}</td>
+          <td class="p-3 font-medium text-slate-700">${b.startTime} - ${b.endTime}</td>
+          <td class="p-3 text-right">
+            ${isOwner ? `
+              <button onclick="deleteBooking('${b.id}')" class="text-red-500 hover:text-red-700 font-medium text-xs">Annulla</button>
+            ` : '<span class="text-slate-300">-</span>'}
+          </td>
+        `;
+
+        tbody.appendChild(tr);
+      });
+    }
+
+    // -------------------------------------------------------------
+    // STATISTICHE
+    // -------------------------------------------------------------
+    function calculateHours(start, end) {
+      if (!start || !end) return 0;
+      const [sH, sM] = start.split(':').map(Number);
+      const [eH, eM] = end.split(':').map(Number);
+      return Math.max(0, ((eH * 60 + eM) - (sH * 60 + sM)) / 60);
+    }
+
+    function renderStats() {
+      const userStatsMap = {};
+      const dateStatsMap = {};
+      const instStatsMap = { 'CD Jasco-J1500': 0, 'Jasco-CPL300': 0, 'Fluorimetro': 0 };
+
+      let grandTotal = 0;
+
+      bookings.forEach(b => {
+        if (!b || !b.startTime || !b.endTime || !b.user || !b.instrument || !b.date) return;
+
+        const hrs = calculateHours(b.startTime, b.endTime);
+        grandTotal += hrs;
+
+        if (!userStatsMap[b.user]) {
+          userStatsMap[b.user] = { 'CD Jasco-J1500': 0, 'Jasco-CPL300': 0, 'Fluorimetro': 0, total: 0 };
+        }
+        if (userStatsMap[b.user][b.instrument] !== undefined) {
+          userStatsMap[b.user][b.instrument] += hrs;
+        }
+        userStatsMap[b.user].total += hrs;
+
+        if (instStatsMap[b.instrument] !== undefined) {
+          instStatsMap[b.instrument] += hrs;
+        }
+
+        if (!dateStatsMap[b.date]) dateStatsMap[b.date] = {};
+        if (!dateStatsMap[b.date][b.user]) dateStatsMap[b.date][b.user] = 0;
+        dateStatsMap[b.date][b.user] += hrs;
+      });
+
+      document.getElementById('statTotalHours').textContent = `${grandTotal.toFixed(1)} ore`;
+
+      let topUser = '-';
+      let maxUHours = 0;
+      Object.keys(userStatsMap).forEach(u => {
+        if (userStatsMap[u].total > maxUHours) {
+          maxUHours = userStatsMap[u].total;
+          topUser = u;
+        }
+      });
+      document.getElementById('statTopUser').textContent = topUser !== '-' ? `${topUser} (${maxUHours}h)` : '-';
+
+      let topInst = '-';
+      let maxIHours = 0;
+      Object.keys(instStatsMap).forEach(i => {
+        if (instStatsMap[i] > maxIHours) {
+          maxIHours = instStatsMap[i];
+          topInst = i;
+        }
+      });
+      document.getElementById('statTopInstrument').textContent = topInst !== '-' ? `${topInst} (${maxIHours}h)` : '-';
+
+      const tbody = document.getElementById('userStatsTableBody');
+      tbody.innerHTML = '';
+
+      const usersList = Object.keys(userStatsMap).sort((a,b) => userStatsMap[b].total - userStatsMap[a].total);
+
+      if (usersList.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="5" class="p-6 text-center text-slate-400 text-xs">Nessun dato di utilizzo registrato.</td></tr>`;
+      } else {
+        usersList.forEach(u => {
+          const row = userStatsMap[u];
+          const tr = document.createElement('tr');
+          tr.className = "hover:bg-slate-50 transition border-b border-slate-100 text-xs";
+          tr.innerHTML = `
+            <td class="p-3 font-semibold text-slate-800">${u}</td>
+            <td class="p-3 text-center text-slate-600">${row['CD Jasco-J1500'].toFixed(1)} h</td>
+            <td class="p-3 text-center text-slate-600">${row['Jasco-CPL300'].toFixed(1)} h</td>
+            <td class="p-3 text-center text-slate-600">${row['Fluorimetro'].toFixed(1)} h</td>
+            <td class="p-3 text-right font-bold text-blue-600">${row.total.toFixed(1)} h</td>
+          `;
+          tbody.appendChild(tr);
+        });
+      }
+
+      if (typeof Chart !== 'undefined') {
+        renderBarChart(usersList, userStatsMap);
+        renderTimelineChart(dateStatsMap, usersList);
+      }
+    }
+
+    function renderBarChart(usersList, userStatsMap) {
+      const canvas = document.getElementById('barChartUserInstrument');
+      if (!canvas) return;
+      const ctx = canvas.getContext('2d');
+
+      if (barChartInstance) barChartInstance.destroy();
+
+      const cdData = usersList.map(u => userStatsMap[u]['CD Jasco-J1500']);
+      const cplData = usersList.map(u => userStatsMap[u]['Jasco-CPL300']);
+      const fluoData = usersList.map(u => userStatsMap[u]['Fluorimetro']);
+
+      barChartInstance = new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels: usersList.map(u => u.split('@')[0]),
+          datasets: [
+            { label: 'CD Jasco-J1500', data: cdData, backgroundColor: '#3b82f6', borderRadius: 6 },
+            { label: 'Jasco-CPL300', data: cplData, backgroundColor: '#10b981', borderRadius: 6 },
+            { label: 'Fluorimetro', data: fluoData, backgroundColor: '#f59e0b', borderRadius: 6 }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { position: 'bottom' } },
+          scales: { y: { beginAtZero: true } }
+        }
+      });
+    }
+
+    function renderTimelineChart(dateStatsMap, usersList) {
+      const canvas = document.getElementById('lineChartTimeline');
+      if (!canvas) return;
+      const ctx = canvas.getContext('2d');
+
+      if (lineChartInstance) lineChartInstance.destroy();
+
+      const sortedDates = Object.keys(dateStatsMap).sort((a,b) => new Date(a) - new Date(b));
+
+      const datasets = usersList.map((user, index) => {
+        const color = USER_COLORS[index % USER_COLORS.length];
+        const data = sortedDates.map(d => dateStatsMap[d][user] || 0);
+
+        return {
+          label: user.split('@')[0],
+          data: data,
+          backgroundColor: color,
+          borderColor: color,
+          borderWidth: 2,
+          borderRadius: 4
+        };
+      });
+
+      lineChartInstance = new Chart(ctx, {
+        type: 'bar',
+        data: { labels: sortedDates, datasets: datasets },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { position: 'bottom' } },
+          scales: { y: { beginAtZero: true } }
+        }
+      });
+    }
+
+    // -------------------------------------------------------------
+    // BANNER NOTIFICHE (z-[100])
+    // -------------------------------------------------------------
+    function showAlert(type, title, message) {
+      const banner = document.getElementById('alertBanner');
+      if (!banner) return;
+
+      document.getElementById('alertTitle').textContent = title;
+      document.getElementById('alertMessage').innerHTML = message;
+      const alertIcon = document.getElementById('alertIcon');
+
+      if (type === 'error') {
+        banner.className = "fixed top-5 left-1/2 -translate-x-1/2 z-[100] w-11/12 max-w-xl p-4 rounded-xl shadow-2xl flex items-start gap-3 border bg-red-50 border-red-300 text-red-900";
+        alertIcon.setAttribute('data-lucide', 'alert-octagon');
+      } else if (type === 'success') {
+        banner.className = "fixed top-5 left-1/2 -translate-x-1/2 z-[100] w-11/12 max-w-xl p-4 rounded-xl shadow-2xl flex items-start gap-3 border bg-emerald-50 border-emerald-300 text-emerald-900";
+        alertIcon.setAttribute('data-lucide', 'check-circle-2');
+      } else {
+        banner.className = "fixed top-5 left-1/2 -translate-x-1/2 z-[100] w-11/12 max-w-xl p-4 rounded-xl shadow-2xl flex items-start gap-3 border bg-blue-50 border-blue-300 text-blue-900";
+        alertIcon.setAttribute('data-lucide', 'info');
+      }
+
+      safeCreateIcons();
+      banner.classList.remove('hidden');
+
+      setTimeout(() => { hideAlert(); }, 6000);
+    }
+
+    function hideAlert() {
+      const banner = document.getElementById('alertBanner');
+      if (banner) banner.classList.add('hidden');
+    }
+  </script>
+</body>
+</html>
