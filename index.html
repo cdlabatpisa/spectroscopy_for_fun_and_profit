@@ -41,9 +41,9 @@
 
       <!-- User Menu & Cloud Status -->
       <div class="flex items-center gap-3">
-        <div id="cloudStatusBadge" class="flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-emerald-950 text-emerald-400 border border-emerald-800">
-          <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-          <span id="cloudStatusText">Global Cloud Sync Active</span>
+        <div id="cloudStatusBadge" class="flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium border bg-slate-800 text-slate-300 border-slate-700">
+          <span id="cloudDot" class="w-2 h-2 rounded-full bg-slate-400"></span>
+          <span id="cloudStatusText">Connecting…</span>
         </div>
 
         <div id="userInfoHeader" class="hidden items-center gap-3">
@@ -160,6 +160,7 @@
               <div class="flex items-center gap-4 text-xs font-medium">
                 <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-full bg-emerald-500 inline-block"></span> Available</span>
                 <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-full bg-amber-500 inline-block"></span> Booked</span>
+                <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-full bg-slate-300 inline-block"></span> Past</span>
               </div>
             </div>
 
@@ -264,7 +265,7 @@
             </div>
           </div>
 
-          <!-- SHARP POLYLINE TIME-SERIES CHART ("GRAFICO A CURVA SPEZZATA") -->
+          <!-- SHARP POLYLINE TIME-SERIES CHART -->
           <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col">
             <div class="flex items-center justify-between mb-4 flex-wrap gap-2">
               <div>
@@ -335,10 +336,11 @@
             <input type="time" id="modalEndTime" required step="1800" class="w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none">
           </div>
         </div>
+        <p class="text-[11px] text-slate-400">Times must be on the hour or half hour. Bookings in the past are not allowed.</p>
 
         <div class="pt-4 flex items-center justify-end gap-3 border-t border-slate-100">
           <button type="button" onclick="closeBookingModal()" class="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-lg">Cancel</button>
-          <button type="submit" class="px-5 py-2 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-sm">Confirm Booking</button>
+          <button type="submit" id="confirmBookingBtn" class="px-5 py-2 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-sm disabled:opacity-50">Confirm Booking</button>
         </div>
       </form>
     </div>
@@ -372,6 +374,29 @@
 
   <!-- JAVASCRIPT APPLICATION LOGIC -->
   <script>
+    // =============================================================
+    // CONFIGURATION
+    // =============================================================
+    // Paste here the URL of your Firebase Realtime Database, e.g.
+    //   "https://strumenti-lab-default-rtdb.europe-west1.firebasedatabase.app/"
+    // (no trailing slash). If left empty the app runs in LOCAL MODE:
+    // every browser keeps its own data and bookings are NOT shared.
+    const FIREBASE_URL = "";
+
+    const CLOUD_ENABLED = !!FIREBASE_URL;
+    const DB = FIREBASE_URL.replace(/\/+$/, '');
+    const POLL_MS = 4000;
+
+    const ADMIN_EMAIL = "matteo.cei@phd.unipi.it";
+    const INSTRUMENTS = ["CD Jasco-J1500", "Jasco-CPL300", "Fluorometer"];
+    const USER_COLORS = [
+      '#2563eb', '#10b981', '#f59e0b', '#ef4444', 
+      '#8b5cf6', '#ec4899', '#14b8a6', '#6366f1', '#06b6d4', '#d97706'
+    ];
+
+    // -------------------------------------------------------------
+    // HELPERS
+    // -------------------------------------------------------------
     function getStorageItem(key, fallback) {
       try {
         const val = localStorage.getItem(key);
@@ -387,19 +412,64 @@
       }
     }
 
-    // -------------------------------------------------------------
-    // REAL-TIME CLOUD SYNC ENGINE (Public CORS-enabled REST Storage)
-    // -------------------------------------------------------------
-    const CLOUD_APP_KEY = "spectroscopy_lab_pisa_unipi_2026_shared_db";
-    const API_URL = `https://keyvalue.immanuel.co/api/KeyVal`;
+    // Local (not UTC) date as YYYY-MM-DD
+    function localDateStr(d = new Date()) {
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${y}-${m}-${day}`;
+    }
 
-    const ADMIN_EMAIL = "matteo.cei@phd.unipi.it";
-    const INSTRUMENTS = ["CD Jasco-J1500", "Jasco-CPL300", "Fluorometer"];
-    const USER_COLORS = [
-      '#2563eb', '#10b981', '#f59e0b', '#ef4444', 
-      '#8b5cf6', '#ec4899', '#14b8a6', '#6366f1', '#06b6d4', '#d97706'
-    ];
+    function toMin(t) {
+      const [h, m] = t.split(':').map(Number);
+      return h * 60 + m;
+    }
 
+    function fmtMin(mins) {
+      return `${String(Math.floor(mins / 60)).padStart(2, '0')}:${String(mins % 60).padStart(2, '0')}`;
+    }
+
+    function nowMinutes() {
+      const n = new Date();
+      return n.getHours() * 60 + n.getMinutes();
+    }
+
+    // A booking is "in the past" if its date is before today, or if it starts
+    // before the current half-hour (so the slot you are in right now is still bookable).
+    function isInPast(date, startTime) {
+      const today = localDateStr();
+      if (date < today) return true;
+      if (date > today) return false;
+      return toMin(startTime) < Math.floor(nowMinutes() / 30) * 30;
+    }
+
+    function overlaps(aStart, aEnd, bStart, bEnd) {
+      return Math.max(aStart, bStart) < Math.min(aEnd, bEnd);
+    }
+
+    // Firebase keys cannot contain . $ # [ ] /
+    function emailKey(email) {
+      return email.toLowerCase().replace(/[.$#\[\]\/%]/g, c => '%' + c.charCodeAt(0).toString(16).toUpperCase());
+    }
+    function keyEmail(key) {
+      try { return decodeURIComponent(key); } catch (e) { return key; }
+    }
+    function instKey(inst) {
+      return inst.replace(/[^A-Za-z0-9]/g, '_');
+    }
+
+    // Slot keys (30 minutes each) covered by a booking, e.g. "0900", "0930"
+    function slotKeys(b) {
+      const keys = [];
+      for (let m = toMin(b.startTime); m < toMin(b.endTime); m += 30) {
+        keys.push(fmtMin(m).replace(':', ''));
+      }
+      return keys;
+    }
+
+    // -------------------------------------------------------------
+    // STATE
+    // -------------------------------------------------------------
     let currentView = 'booking';
     let selectedInstrument = INSTRUMENTS[0];
     let currentUser = getStorageItem('lab_current_user', null);
@@ -410,18 +480,21 @@
 
     let barChartInstance = null;
     let lineChartInstance = null;
+    let savingBooking = false;
 
-    if (!Array.isArray(authorizedUsers)) authorizedUsers = [];
-    if (!authorizedUsers.some(u => u && u.email && u.email.toLowerCase() === ADMIN_EMAIL.toLowerCase())) {
-      authorizedUsers.push({ email: ADMIN_EMAIL, status: 'Registered' });
+    function ensureAdminDefaults() {
+      if (!Array.isArray(authorizedUsers)) authorizedUsers = [];
+      if (!authorizedUsers.some(u => u && u.email && u.email.toLowerCase() === ADMIN_EMAIL.toLowerCase())) {
+        authorizedUsers.push({ email: ADMIN_EMAIL, status: 'Registered' });
+      }
+      if (typeof registeredPasses !== 'object' || registeredPasses === null) registeredPasses = {};
+      if (!registeredPasses[ADMIN_EMAIL.toLowerCase()]) {
+        registeredPasses[ADMIN_EMAIL.toLowerCase()] = "admin123";
+      }
     }
+    if (!Array.isArray(bookings)) bookings = [];
+    ensureAdminDefaults();
 
-    if (typeof registeredPasses !== 'object' || registeredPasses === null) registeredPasses = {};
-    if (!registeredPasses[ADMIN_EMAIL.toLowerCase()]) {
-      registeredPasses[ADMIN_EMAIL.toLowerCase()] = "admin123";
-    }
-
-    // Dynamic Registered Status Verification
     function isUserRegistered(email) {
       if (!email) return false;
       const lower = email.toLowerCase();
@@ -430,76 +503,115 @@
       return found && found.status === 'Registered';
     }
 
-    // Save and Sync Data across network
-    async function syncAndPropagateData() {
-      localStorage.setItem('lab_bookings', JSON.stringify(bookings));
-      localStorage.setItem('lab_authorized_users', JSON.stringify(authorizedUsers));
-      localStorage.setItem('lab_registered_passes', JSON.stringify(registeredPasses));
+    function persistLocal() {
+      try {
+        localStorage.setItem('lab_bookings', JSON.stringify(bookings));
+        localStorage.setItem('lab_authorized_users', JSON.stringify(authorizedUsers));
+        localStorage.setItem('lab_registered_passes', JSON.stringify(registeredPasses));
+      } catch (e) {}
+    }
 
-      const payload = {
-        bookings: bookings,
-        authorizedUsers: authorizedUsers,
-        registeredPasses: registeredPasses,
-        timestamp: Date.now()
+    // -------------------------------------------------------------
+    // CLOUD LAYER (Firebase Realtime Database, REST API)
+    // -------------------------------------------------------------
+    function setCloudStatus(state) {
+      const badge = document.getElementById('cloudStatusBadge');
+      const text = document.getElementById('cloudStatusText');
+      const dot = document.getElementById('cloudDot');
+      if (!badge) return;
+      const map = {
+        ok:    { t: 'Cloud sync active',              b: 'bg-emerald-950 text-emerald-400 border-emerald-800', d: 'bg-emerald-400 animate-pulse' },
+        error: { t: 'Cloud unreachable – retrying',   b: 'bg-red-950 text-red-300 border-red-800',             d: 'bg-red-400' },
+        local: { t: 'Local mode – data NOT shared',   b: 'bg-amber-950 text-amber-300 border-amber-800',       d: 'bg-amber-400' }
       };
-
-      try {
-        const encodedData = encodeURIComponent(JSON.stringify(payload));
-        await fetch(`${API_URL}/UpdateValue/${CLOUD_APP_KEY}/${encodedData}`);
-      } catch (e) {}
+      const m = map[state];
+      badge.className = `flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium border ${m.b}`;
+      dot.className = `w-2 h-2 rounded-full ${m.d}`;
+      text.textContent = m.t;
     }
 
-    // Pull Remote Cloud Updates and Merge
+    // Generic write helper. Returns 'ok' | 'denied' | 'error'.
+    async function cloudWrite(method, path, body) {
+      try {
+        const r = await fetch(`${DB}/${path}.json`, {
+          method,
+          headers: { 'Content-Type': 'application/json' },
+          body: body === undefined ? undefined : JSON.stringify(body)
+        });
+        if (r.ok) { setCloudStatus('ok'); return 'ok'; }
+        if (r.status === 401 || r.status === 403) return 'denied';
+        setCloudStatus('error');
+        return 'error';
+      } catch (e) {
+        setCloudStatus('error');
+        return 'error';
+      }
+    }
+
+    // Pull the whole shared state. The cloud is the single source of truth.
     async function pullCloudData() {
+      if (!CLOUD_ENABLED) return;
       try {
-        const response = await fetch(`${API_URL}/GetValue/${CLOUD_APP_KEY}`);
-        if (!response.ok) return;
+        const r = await fetch(`${DB}/lab.json`, { cache: 'no-store' });
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        const data = (await r.json()) || {};
 
-        const rawText = await response.text();
-        if (!rawText || rawText === "null" || rawText.trim() === "") return;
+        bookings = Object.values(data.bookings || {}).filter(b => b && b.id);
 
-        let data = null;
-        try {
-          data = JSON.parse(JSON.parse(rawText));
-        } catch (e) {
-          try { data = JSON.parse(rawText); } catch(err) {}
-        }
+        registeredPasses = {};
+        Object.entries(data.passes || {}).forEach(([k, v]) => { registeredPasses[keyEmail(k)] = v; });
 
-        if (data) {
-          if (Array.isArray(data.bookings)) {
-            const map = new Map();
-            bookings.forEach(b => { if (b && b.id) map.set(b.id, b); });
-            data.bookings.forEach(b => { if (b && b.id) map.set(b.id, b); });
-            bookings = Array.from(map.values());
-            localStorage.setItem('lab_bookings', JSON.stringify(bookings));
-          }
+        authorizedUsers = Object.entries(data.authorized || {}).map(([k, v]) => ({
+          email: keyEmail(k),
+          status: (v && v.status) || 'Pending'
+        }));
 
-          if (data.registeredPasses) {
-            registeredPasses = { ...registeredPasses, ...data.registeredPasses };
-            localStorage.setItem('lab_registered_passes', JSON.stringify(registeredPasses));
-          }
-
-          if (Array.isArray(data.authorizedUsers)) {
-            const userMap = new Map();
-            authorizedUsers.forEach(u => { if (u && u.email) userMap.set(u.email.toLowerCase(), u); });
-            data.authorizedUsers.forEach(u => { if (u && u.email) userMap.set(u.email.toLowerCase(), u); });
-            authorizedUsers = Array.from(userMap.values());
-            localStorage.setItem('lab_authorized_users', JSON.stringify(authorizedUsers));
-          }
-
-          refreshUI();
-        }
-      } catch (e) {}
+        ensureAdminDefaults();
+        persistLocal();
+        setCloudStatus('ok');
+        refreshUI();
+      } catch (e) {
+        setCloudStatus('error');
+      }
     }
 
+    // Atomic booking creation. One multi-path PATCH writes the booking AND all of its
+    // 30-minute slot markers. The database rules reject any write to a slot that
+    // already exists, so if someone else got there first the whole PATCH fails.
+    async function cloudCreateBooking(b) {
+      const updates = {};
+      updates[`bookings/${b.id}`] = b;
+      slotKeys(b).forEach(k => { updates[`slots/${instKey(b.instrument)}/${b.date}/${k}`] = b.id; });
+      const res = await cloudWrite('PATCH', 'lab', updates);
+      return res === 'denied' ? 'conflict' : res;
+    }
+
+    async function cloudDeleteBooking(b) {
+      const updates = {};
+      updates[`bookings/${b.id}`] = null;
+      slotKeys(b).forEach(k => { updates[`slots/${instKey(b.instrument)}/${b.date}/${k}`] = null; });
+      return cloudWrite('PATCH', 'lab', updates);
+    }
+
+    // -------------------------------------------------------------
+    // INIT
+    // -------------------------------------------------------------
     document.addEventListener("DOMContentLoaded", () => {
       safeCreateIcons();
       const dateElem = document.getElementById('selectedDate');
-      if (dateElem) dateElem.value = new Date().toISOString().split('T')[0];
-      
+      if (dateElem) dateElem.value = localDateStr();
+
+      setCloudStatus(CLOUD_ENABLED ? 'error' : 'local');
+      if (!CLOUD_ENABLED) {
+        console.warn('FIREBASE_URL is empty: running in local mode, bookings are not shared between users.');
+      }
+
       checkAuthStatus();
       pullCloudData();
-      setInterval(pullCloudData, 3000); // 3-second live cloud poll
+      setInterval(pullCloudData, POLL_MS);
+      document.addEventListener('visibilitychange', () => { if (!document.hidden) pullCloudData(); });
+      // keep "past" slots and "in use now" status up to date even in local mode
+      setInterval(() => { if (currentUser) refreshUI(); }, 60000);
     });
 
     function refreshUI() {
@@ -588,7 +700,7 @@
       }
     }
 
-    function handleLogin(e) {
+    async function handleLogin(e) {
       e.preventDefault();
       const email = document.getElementById('loginEmail').value.trim().toLowerCase();
       const pass = document.getElementById('loginPassword').value;
@@ -597,6 +709,9 @@
         showAlert('error', 'Incomplete Fields', 'Please enter both email and password.');
         return;
       }
+
+      // make sure accounts registered from other computers are known
+      await pullCloudData();
 
       if (email === ADMIN_EMAIL.toLowerCase() && !registeredPasses[email]) {
         registeredPasses[email] = "admin123";
@@ -615,7 +730,8 @@
           authorizedUsers.push({ email: email, status: 'Registered' });
         }
 
-        syncAndPropagateData();
+        persistLocal();
+        if (CLOUD_ENABLED) cloudWrite('PUT', `lab/authorized/${emailKey(email)}`, { status: 'Registered' });
         checkAuthStatus();
         showAlert('success', 'Signed In', `Welcome ${email}`);
       } else if (!savedPass) {
@@ -625,7 +741,7 @@
       }
     }
 
-    function handleRegister(e) {
+    async function handleRegister(e) {
       e.preventDefault();
       const email = document.getElementById('regEmail').value.trim().toLowerCase();
       const pass = document.getElementById('regPassword').value;
@@ -635,12 +751,29 @@
         return;
       }
 
+      await pullCloudData();
+
       const isExplicitlyAuthorized = authorizedUsers.some(u => u && u.email && u.email.toLowerCase() === email);
       const isInstitutional = email.endsWith('@unipi.it') || email.endsWith('@phd.unipi.it') || email.endsWith('@studenti.unipi.it');
 
       if (!isExplicitlyAuthorized && !isInstitutional) {
         showAlert('error', 'Unauthorized', `Email ${email} does not belong to unipi.it domain or is not authorized by Admin.`);
         return;
+      }
+
+      // do not let anybody overwrite the password of an existing account
+      if (registeredPasses[email]) {
+        showAlert('error', 'Already Registered', 'This email already has an account. Use "Sign In" instead.');
+        return;
+      }
+
+      if (CLOUD_ENABLED) {
+        const r1 = await cloudWrite('PUT', `lab/passes/${emailKey(email)}`, pass);
+        const r2 = await cloudWrite('PUT', `lab/authorized/${emailKey(email)}`, { status: 'Registered' });
+        if (r1 !== 'ok' || r2 !== 'ok') {
+          showAlert('error', 'Server Error', 'Could not save the registration on the server. Please try again.');
+          return;
+        }
       }
 
       registeredPasses[email] = pass;
@@ -652,7 +785,7 @@
         authorizedUsers.push({ email: email, status: 'Registered' });
       }
 
-      syncAndPropagateData();
+      persistLocal();
 
       currentUser = { email: email };
       localStorage.setItem('lab_current_user', JSON.stringify(currentUser));
@@ -708,7 +841,7 @@
       safeCreateIcons();
     }
 
-    function addAuthorizedEmail(e) {
+    async function addAuthorizedEmail(e) {
       e.preventDefault();
       const email = document.getElementById('newAuthEmail').value.trim().toLowerCase();
 
@@ -718,37 +851,52 @@
       }
 
       const isReg = isUserRegistered(email);
-      const newUser = { email: email, status: isReg ? 'Registered' : 'Pending' };
-      authorizedUsers.push(newUser);
+      const status = isReg ? 'Registered' : 'Pending';
 
-      syncAndPropagateData();
+      if (CLOUD_ENABLED) {
+        const r = await cloudWrite('PUT', `lab/authorized/${emailKey(email)}`, { status });
+        if (r !== 'ok') {
+          showAlert('error', 'Server Error', 'Could not save on the server. Please try again.');
+          return;
+        }
+      }
+
+      authorizedUsers.push({ email: email, status: status });
+      persistLocal();
 
       document.getElementById('newAuthEmail').value = '';
       renderAuthorizedUsersList();
       showAlert('success', 'Email Authorized', `${email} can now register.`);
     }
 
-    function removeAuthorizedEmail(email) {
+    async function removeAuthorizedEmail(email) {
+      if (CLOUD_ENABLED) {
+        const r = await cloudWrite('DELETE', `lab/authorized/${emailKey(email)}`);
+        if (r !== 'ok') {
+          showAlert('error', 'Server Error', 'Could not update the server. Please try again.');
+          return;
+        }
+      }
       authorizedUsers = authorizedUsers.filter(u => u && u.email && u.email.toLowerCase() !== email.toLowerCase());
-      syncAndPropagateData();
+      persistLocal();
       renderAuthorizedUsersList();
     }
 
+    // -------------------------------------------------------------
+    // INSTRUMENT CARDS & TIMELINE
+    // -------------------------------------------------------------
     function renderInstrumentCards() {
       const container = document.getElementById('instrumentCardsContainer');
       if (!container) return;
       container.innerHTML = '';
 
-      const now = new Date();
-      const currentDateStr = now.toISOString().split('T')[0];
-      const currentMinutes = now.getHours() * 60 + now.getMinutes();
+      const currentDateStr = localDateStr();
+      const currentMinutes = nowMinutes();
 
       INSTRUMENTS.forEach(inst => {
         const currentBooking = bookings.find(b => {
           if (!b || b.instrument !== inst || b.date !== currentDateStr || !b.startTime || !b.endTime) return false;
-          const [sH, sM] = b.startTime.split(':').map(Number);
-          const [eH, eM] = b.endTime.split(':').map(Number);
-          return currentMinutes >= (sH * 60 + sM) && currentMinutes < (eH * 60 + eM);
+          return currentMinutes >= toMin(b.startTime) && currentMinutes < toMin(b.endTime);
         });
 
         const isSelected = selectedInstrument === inst;
@@ -802,18 +950,23 @@
       container.innerHTML = '';
 
       const dateStr = document.getElementById('selectedDate').value;
+      const today = localDateStr();
+      const nowMin = nowMinutes();
+      const floorNow = Math.floor(nowMin / 30) * 30;
       const hours = Array.from({ length: 12 }, (_, i) => i + 8);
 
       hours.forEach(hour => {
-        const timeFormatted = `${String(hour).padStart(2, '0')}:00`;
-        const timeNextFormatted = `${String(hour + 1).padStart(2, '0')}:00`;
+        const hs = hour * 60;
+        const he = hs + 60;
+        const timeFormatted = fmtMin(hs);
+        const timeNextFormatted = fmtMin(he);
 
         const booking = bookings.find(b => {
           if (!b || b.instrument !== selectedInstrument || b.date !== dateStr || !b.startTime || !b.endTime) return false;
-          const [sH] = b.startTime.split(':').map(Number);
-          const [eH] = b.endTime.split(':').map(Number);
-          return hour >= sH && hour < eH;
+          return overlaps(toMin(b.startTime), toMin(b.endTime), hs, he);
         });
+
+        const isPastSlot = dateStr < today || (dateStr === today && he <= nowMin);
 
         const slot = document.createElement('div');
         if (booking) {
@@ -823,13 +976,27 @@
               <span>${timeFormatted}</span>
               <span class="text-[10px] bg-amber-200/60 px-1.5 py-0.5 rounded">Booked</span>
             </div>
-            <div class="truncate text-xs font-medium mt-1">
+            <div class="truncate text-xs font-medium mt-1" title="${booking.startTime} - ${booking.endTime}">
               <i data-lucide="user" class="w-3 h-3 inline mr-1"></i>${booking.user}
             </div>
           `;
+        } else if (isPastSlot) {
+          slot.className = "p-3 rounded-xl border bg-slate-100 border-slate-200 text-slate-400 flex flex-col justify-between h-20 cursor-not-allowed";
+          slot.innerHTML = `
+            <div class="flex justify-between items-center text-xs font-bold">
+              <span>${timeFormatted}</span>
+              <span class="text-[10px] bg-slate-200 px-1.5 py-0.5 rounded">Past</span>
+            </div>
+            <div class="text-[11px] mt-1">Not bookable</div>
+          `;
         } else {
+          // for the current hour start from the current half hour, not from a time already gone
+          let startMin = hs;
+          if (dateStr === today && hs < floorNow) startMin = floorNow;
+          const startLabel = fmtMin(startMin);
+
           slot.className = "p-3 rounded-xl border bg-emerald-50/50 border-emerald-200/70 text-emerald-900 hover:bg-emerald-100/70 cursor-pointer transition flex flex-col justify-between h-20 shadow-sm";
-          slot.onclick = () => openBookingModal(timeFormatted, timeNextFormatted);
+          slot.onclick = () => openBookingModal(startLabel, timeNextFormatted);
           slot.innerHTML = `
             <div class="flex justify-between items-center text-xs font-bold text-emerald-800">
               <span>${timeFormatted}</span>
@@ -847,10 +1014,27 @@
       safeCreateIcons();
     }
 
+    // -------------------------------------------------------------
+    // BOOKINGS
+    // -------------------------------------------------------------
     function openBookingModal(startTime = "09:00", endTime = "10:00") {
+      const sel = document.getElementById('selectedDate').value;
+      const today = localDateStr();
+      // if opened from the "New Booking" button on a past date, default to today
+      const dateValue = sel && sel >= today ? sel : today;
+
+      // default start time must not be in the past when booking for today
+      if (dateValue === today && toMin(startTime) < Math.floor(nowMinutes() / 30) * 30) {
+        const fn = Math.floor(nowMinutes() / 30) * 30;
+        startTime = fmtMin(fn);
+        endTime = fmtMin(Math.min(fn + 60, 24 * 60 - 1));
+      }
+
       document.getElementById('modalInstrument').value = selectedInstrument;
       document.getElementById('modalUser').value = currentUser ? currentUser.email : '';
-      document.getElementById('modalDate').value = document.getElementById('selectedDate').value;
+      const modalDate = document.getElementById('modalDate');
+      modalDate.min = today;
+      modalDate.value = dateValue;
       document.getElementById('modalStartTime').value = startTime;
       document.getElementById('modalEndTime').value = endTime;
 
@@ -861,8 +1045,9 @@
       document.getElementById('bookingModal').classList.add('hidden');
     }
 
-    function saveBooking(e) {
+    async function saveBooking(e) {
       e.preventDefault();
+      if (savingBooking) return;
 
       const inst = document.getElementById('modalInstrument').value;
       const user = document.getElementById('modalUser').value;
@@ -870,64 +1055,107 @@
       const startTime = document.getElementById('modalStartTime').value;
       const endTime = document.getElementById('modalEndTime').value;
 
+      if (!date || !startTime || !endTime) {
+        showAlert('error', 'Incomplete Fields', 'Please fill in date, start time and end time.');
+        return;
+      }
+
       if (startTime >= endTime) {
         showAlert('error', 'Invalid Time Range', 'End time must be after start time.');
         return;
       }
 
-      const conflict = checkConflict(inst, date, startTime, endTime);
-
-      if (conflict) {
-        showAlert(
-          'error', 
-          'Instrument Occupied!', 
-          `The instrument <strong>${inst}</strong> is already booked by <strong>${conflict.user}</strong> on ${date} (${conflict.startTime} - ${conflict.endTime}).`
-        );
+      if (toMin(startTime) % 30 !== 0 || toMin(endTime) % 30 !== 0) {
+        showAlert('error', 'Invalid Time', 'Times must be on the hour or on the half hour (e.g. 09:00, 09:30).');
         return;
       }
 
-      const newBooking = {
-        id: Date.now().toString(),
-        instrument: inst,
-        user: user,
-        date: date,
-        startTime: startTime,
-        endTime: endTime
-      };
+      if (isInPast(date, startTime)) {
+        showAlert('error', 'Date/Time in the Past', 'You cannot book an instrument in the past. Choose a current or future time.');
+        return;
+      }
 
-      bookings.push(newBooking);
+      savingBooking = true;
+      const btn = document.getElementById('confirmBookingBtn');
+      btn.disabled = true;
+      btn.textContent = 'Saving…';
 
-      syncAndPropagateData();
+      try {
+        // fetch the latest state first so the check below sees other people's bookings
+        if (CLOUD_ENABLED) await pullCloudData();
 
-      closeBookingModal();
-      refreshUI();
-      showAlert('success', 'Booking Confirmed', `Booked ${inst} for ${date}.`);
+        const conflict = checkConflict(inst, date, startTime, endTime);
+        if (conflict) {
+          showAlert(
+            'error', 
+            'Instrument Occupied!', 
+            `The instrument <strong>${inst}</strong> is already booked by <strong>${conflict.user}</strong> on ${date} (${conflict.startTime} - ${conflict.endTime}).`
+          );
+          return;
+        }
+
+        const newBooking = {
+          id: Date.now().toString() + '_' + Math.random().toString(36).slice(2, 7),
+          instrument: inst,
+          user: user,
+          date: date,
+          startTime: startTime,
+          endTime: endTime
+        };
+
+        if (CLOUD_ENABLED) {
+          const res = await cloudCreateBooking(newBooking);
+          if (res === 'conflict') {
+            // someone booked the same slot in the last few milliseconds
+            await pullCloudData();
+            showAlert('error', 'Instrument Just Booked!', `Someone else booked <strong>${inst}</strong> for this time a moment ago. Please choose another slot.`);
+            return;
+          }
+          if (res !== 'ok') {
+            showAlert('error', 'Server Unreachable', 'The booking was NOT saved because the server could not be reached. Please try again.');
+            return;
+          }
+        }
+
+        bookings.push(newBooking);
+        persistLocal();
+
+        closeBookingModal();
+        refreshUI();
+        showAlert('success', 'Booking Confirmed', `Booked ${inst} for ${date}.`);
+      } finally {
+        savingBooking = false;
+        btn.disabled = false;
+        btn.textContent = 'Confirm Booking';
+      }
     }
 
     function checkConflict(instrument, date, start, end) {
-      const [newStartH, newStartM] = start.split(':').map(Number);
-      const [newEndH, newEndM] = end.split(':').map(Number);
-      const newStartMins = newStartH * 60 + newStartM;
-      const newEndMins = newEndH * 60 + newEndM;
+      const newStartMins = toMin(start);
+      const newEndMins = toMin(end);
 
       return bookings.find(b => {
         if (!b || b.instrument !== instrument || b.date !== date || !b.startTime || !b.endTime) return false;
-
-        const [bStartH, bStartM] = b.startTime.split(':').map(Number);
-        const [bEndH, bEndM] = b.endTime.split(':').map(Number);
-        const bStartMins = bStartH * 60 + bStartM;
-        const bEndMins = bEndH * 60 + bEndM;
-
-        return Math.max(newStartMins, bStartMins) < Math.min(newEndMins, bEndMins);
+        return overlaps(newStartMins, newEndMins, toMin(b.startTime), toMin(b.endTime));
       });
     }
 
-    function deleteBooking(id) {
+    async function deleteBooking(id) {
       if (!confirm("Are you sure you want to delete this booking?")) return;
 
-      bookings = bookings.filter(b => b && b.id !== id);
+      const b = bookings.find(x => x && x.id === id);
+      if (!b) return;
 
-      syncAndPropagateData();
+      if (CLOUD_ENABLED) {
+        const res = await cloudDeleteBooking(b);
+        if (res !== 'ok') {
+          showAlert('error', 'Server Unreachable', 'The booking was NOT cancelled because the server could not be reached.');
+          return;
+        }
+      }
+
+      bookings = bookings.filter(x => x && x.id !== id);
+      persistLocal();
 
       refreshUI();
       showAlert('info', 'Deleted', 'Booking removed.');
@@ -974,11 +1202,12 @@
       });
     }
 
+    // -------------------------------------------------------------
+    // STATISTICS
+    // -------------------------------------------------------------
     function calculateHours(start, end) {
       if (!start || !end) return 0;
-      const [sH, sM] = start.split(':').map(Number);
-      const [eH, eM] = end.split(':').map(Number);
-      return Math.max(0, ((eH * 60 + eM) - (sH * 60 + sM)) / 60);
+      return Math.max(0, (toMin(end) - toMin(start)) / 60);
     }
 
     function renderStats() {
@@ -1101,7 +1330,7 @@
       });
     }
 
-    // CHART 2: STRICT SHARP POLYLINE ("CURVA SPEZZATA" - TENSION: 0)
+    // CHART 2: STRICT SHARP POLYLINE (TENSION: 0)
     function renderSharpPolylineChart(timeBucketStatsMap, usersList, timeFrame) {
       const canvas = document.getElementById('lineChartTimeline');
       if (!canvas) return;
@@ -1121,7 +1350,7 @@
           borderColor: color,
           backgroundColor: color,
           borderWidth: 3,
-          tension: 0, // SHARP STRAIGHT LINES ONLY
+          tension: 0,
           pointRadius: 5,
           pointHoverRadius: 7,
           pointBackgroundColor: color,
@@ -1158,6 +1387,10 @@
       });
     }
 
+    // -------------------------------------------------------------
+    // ALERTS
+    // -------------------------------------------------------------
+    let alertTimer = null;
     function showAlert(type, title, message) {
       const banner = document.getElementById('alertBanner');
       if (!banner) return;
@@ -1180,7 +1413,8 @@
       safeCreateIcons();
       banner.classList.remove('hidden');
 
-      setTimeout(() => { hideAlert(); }, 6000);
+      if (alertTimer) clearTimeout(alertTimer);
+      alertTimer = setTimeout(() => { hideAlert(); }, 6000);
     }
 
     function hideAlert() {
