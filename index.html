@@ -378,7 +378,7 @@
     // CONFIGURATION
     // =============================================================
     // Paste here the URL of your Firebase Realtime Database, e.g.
-    //   "https://strumenti-lab-default-rtdb.europe-west1.firebasedatabase.app/"
+    //   "https://my-lab-default-rtdb.europe-west1.firebasedatabase.app"
     // (no trailing slash). If left empty the app runs in LOCAL MODE:
     // every browser keeps its own data and bookings are NOT shared.
     const FIREBASE_URL = "https://strumenti-lab-default-rtdb.europe-west1.firebasedatabase.app";
@@ -447,12 +447,14 @@
       return Math.max(aStart, bStart) < Math.min(aEnd, bEnd);
     }
 
-    // Firebase keys cannot contain . $ # [ ] /
+    // Firebase keys cannot contain . $ # [ ] /  -> in emails we swap "." with ","
+    // (a comma is a valid key character and never appears in a normal email address).
+    // Do NOT use %-encoding: the server decodes the URL and would see a "." again.
     function emailKey(email) {
-      return email.toLowerCase().replace(/[.$#\[\]\/%]/g, c => '%' + c.charCodeAt(0).toString(16).toUpperCase());
+      return email.toLowerCase().trim().replace(/\./g, ',').replace(/[$#\[\]\/%]/g, '_');
     }
     function keyEmail(key) {
-      try { return decodeURIComponent(key); } catch (e) { return key; }
+      return key.replace(/,/g, '.');
     }
     function instKey(inst) {
       return inst.replace(/[^A-Za-z0-9]/g, '_');
@@ -539,14 +541,21 @@
           body: body === undefined ? undefined : JSON.stringify(body)
         });
         if (r.ok) { setCloudStatus('ok'); return 'ok'; }
+        let txt = '';
+        try { txt = await r.text(); } catch (e2) {}
+        lastCloudError = `HTTP ${r.status} ${txt}`.slice(0, 200);
+        console.error('Cloud write failed:', method, path, lastCloudError);
         if (r.status === 401 || r.status === 403) return 'denied';
         setCloudStatus('error');
         return 'error';
       } catch (e) {
+        lastCloudError = 'Network error: ' + e.message;
+        console.error('Cloud write failed:', method, path, e);
         setCloudStatus('error');
         return 'error';
       }
     }
+    let lastCloudError = '';
 
     // Pull the whole shared state. The cloud is the single source of truth.
     async function pullCloudData() {
@@ -771,7 +780,7 @@
         const r1 = await cloudWrite('PUT', `lab/passes/${emailKey(email)}`, pass);
         const r2 = await cloudWrite('PUT', `lab/authorized/${emailKey(email)}`, { status: 'Registered' });
         if (r1 !== 'ok' || r2 !== 'ok') {
-          showAlert('error', 'Server Error', 'Could not save the registration on the server. Please try again.');
+          showAlert('error', 'Server Error', 'Could not save the registration on the server. Please try again.<br><span class="text-xs opacity-70">' + lastCloudError + '</span>');
           return;
         }
       }
@@ -856,7 +865,7 @@
       if (CLOUD_ENABLED) {
         const r = await cloudWrite('PUT', `lab/authorized/${emailKey(email)}`, { status });
         if (r !== 'ok') {
-          showAlert('error', 'Server Error', 'Could not save on the server. Please try again.');
+          showAlert('error', 'Server Error', 'Could not save on the server. Please try again.<br><span class="text-xs opacity-70">' + lastCloudError + '</span>');
           return;
         }
       }
