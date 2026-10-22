@@ -273,9 +273,9 @@
             <div class="flex items-center justify-between mb-4 flex-wrap gap-2">
               <div>
                 <h3 class="text-base font-bold text-slate-900 flex items-center gap-2">
-                  <i data-lucide="activity" class="w-5 h-5 text-blue-600"></i> Piecewise Usage Trends (Polyline)
+                  <i data-lucide="activity" class="w-5 h-5 text-blue-600"></i> Cumulative Usage Hours (Polyline)
                 </h3>
-                <p class="text-xs text-slate-500">Straight line plot per user across time</p>
+                <p class="text-xs text-slate-500">Running total of booked hours per user over time</p>
               </div>
               <div>
                 <select id="statsTimeFrame" onchange="renderStats()" class="px-3 py-1 border rounded-lg text-xs font-semibold text-slate-700 bg-slate-50 outline-none focus:ring-2 focus:ring-blue-500">
@@ -302,7 +302,7 @@
     <div class="bg-white rounded-2xl shadow-2xl max-w-md w-full overflow-hidden border border-slate-100">
       <div class="bg-slate-900 p-4 text-white flex justify-between items-center">
         <h3 class="font-bold text-base flex items-center gap-2">
-          <i data-lucide="calendar-plus" class="w-5 h-5 text-blue-400"></i> Book Instrument
+          <i data-lucide="calendar-plus" class="w-5 h-5 text-blue-400"></i> <span id="modalTitle">Book Instrument</span>
         </h3>
         <button onclick="closeBookingModal()" class="text-slate-400 hover:text-white">
           <i data-lucide="x" class="w-5 h-5"></i>
@@ -503,6 +503,7 @@
     let barChartInstance = null;
     let lineChartInstance = null;
     let savingBooking = false;
+    let editingId = null; // id of the booking being edited in the modal (null = new booking)
 
     function ensureAdminDefaults() {
       if (!Array.isArray(authorizedUsers)) authorizedUsers = [];
@@ -611,6 +612,22 @@
       const updates = {};
       updates[`bookings/${b.id}`] = b;
       slotKeys(b).forEach(k => { updates[`slots/${instKey(b.instrument)}/${b.date}/${k}`] = b.id; });
+      const res = await cloudWrite('PATCH', 'lab', updates);
+      return res === 'denied' ? 'conflict' : res;
+    }
+
+    // Atomic booking update. Only slot markers that are NEW are written (the rules would
+    // reject re-writing an existing one) and only markers that are no longer needed are
+    // removed. If another user took one of the new slots, the whole PATCH is rejected and
+    // the old booking stays untouched.
+    async function cloudUpdateBooking(oldB, newB) {
+      const slotPath = (b, k) => `slots/${instKey(b.instrument)}/${b.date}/${k}`;
+      const oldPaths = new Set(slotKeys(oldB).map(k => slotPath(oldB, k)));
+      const newPaths = new Set(slotKeys(newB).map(k => slotPath(newB, k)));
+      const updates = {};
+      updates[`bookings/${newB.id}`] = newB;
+      newPaths.forEach(p => { if (!oldPaths.has(p)) updates[p] = newB.id; });
+      oldPaths.forEach(p => { if (!newPaths.has(p)) updates[p] = null; });
       const res = await cloudWrite('PATCH', 'lab', updates);
       return res === 'denied' ? 'conflict' : res;
     }
@@ -1007,11 +1024,13 @@
 
         const slot = document.createElement('div');
         if (booking) {
-          slot.className = "p-3 rounded-xl border bg-amber-50 border-amber-200 text-amber-900 flex flex-col justify-between h-20 shadow-sm";
+          const editable = canManage(booking) && !isEnded(booking);
+          slot.className = "p-3 rounded-xl border bg-amber-50 border-amber-200 text-amber-900 flex flex-col justify-between h-20 shadow-sm cursor-pointer hover:bg-amber-100 transition";
+          slot.onclick = () => onBookedSlotClick(booking.id);
           slot.innerHTML = `
             <div class="flex justify-between items-center text-xs font-bold">
               <span>${timeFormatted}</span>
-              <span class="text-[10px] bg-amber-200/60 px-1.5 py-0.5 rounded">Booked</span>
+              <span class="text-[10px] bg-amber-200/60 px-1.5 py-0.5 rounded">${editable ? '<i data-lucide="pencil" class="w-3 h-3 inline -mt-0.5"></i> Edit' : 'Booked'}</span>
             </div>
             <div class="truncate text-xs font-medium mt-1" title="${esc(booking.startTime + ' - ' + booking.endTime + (booking.notes ? ' | ' + booking.notes : ''))}">
               <i data-lucide="user" class="w-3 h-3 inline mr-1"></i>${booking.user}
@@ -1075,6 +1094,59 @@
       document.getElementById('modalStartTime').value = startTime;
       document.getElementById('modalEndTime').value = endTime;
       document.getElementById('modalNotes').value = '';
+      editingId = null;
+      document.getElementById('modalTitle').textContent = 'Book Instrument';
+      document.getElementById('confirmBookingBtn').textContent = 'Confirm Booking';
+
+      document.getElementById('bookingModal').classList.remove('hidden');
+    }
+
+    // A booking has ended when its date is before today, or today and its end time has passed.
+    function isEnded(b) {
+      const today = localDateStr();
+      if (b.date < today) return true;
+      if (b.date > today) return false;
+      return toMin(b.endTime) <= nowMinutes();
+    }
+
+    // Owner or admin
+    function canManage(b) {
+      if (!currentUser || !currentUser.email || !b || !b.user) return false;
+      const me = currentUser.email.toLowerCase();
+      return me === b.user.toLowerCase() || me === ADMIN_EMAIL.toLowerCase();
+    }
+
+    // Click on a booked slot of the calendar: edit if allowed, otherwise show the details.
+    function onBookedSlotClick(id) {
+      const b = bookings.find(x => x && x.id === id);
+      if (!b) return;
+      if (canManage(b) && !isEnded(b)) {
+        openEditModal(b);
+        return;
+      }
+      const reason = isEnded(b) ? 'This booking has already ended and cannot be edited.' : 'Only the person who booked can edit it.';
+      showAlert(
+        'info',
+        'Booking details',
+        `<strong>${esc(b.instrument)}</strong> – ${esc(b.user)}<br>${esc(b.date)}, ${esc(b.startTime)} - ${esc(b.endTime)}` +
+        (b.notes ? `<br>Notes: ${esc(b.notes)}` : '') +
+        `<br><span class="text-xs opacity-70">${reason}</span>`
+      );
+    }
+
+    function openEditModal(b) {
+      editingId = b.id;
+      document.getElementById('modalTitle').textContent = 'Edit Booking';
+      document.getElementById('confirmBookingBtn').textContent = 'Save Changes';
+
+      document.getElementById('modalInstrument').value = b.instrument;
+      document.getElementById('modalUser').value = b.user;
+      const modalDate = document.getElementById('modalDate');
+      modalDate.min = localDateStr();
+      modalDate.value = b.date;
+      document.getElementById('modalStartTime').value = b.startTime;
+      document.getElementById('modalEndTime').value = b.endTime;
+      document.getElementById('modalNotes').value = b.notes || '';
 
       document.getElementById('bookingModal').classList.remove('hidden');
     }
@@ -1093,6 +1165,7 @@
       const startTime = document.getElementById('modalStartTime').value;
       const endTime = document.getElementById('modalEndTime').value;
       const notes = document.getElementById('modalNotes').value.trim().slice(0, 300);
+      const editId = editingId;
 
       if (!date || !startTime || !endTime) {
         showAlert('error', 'Incomplete Fields', 'Please fill in date, start time and end time.');
@@ -1109,7 +1182,10 @@
         return;
       }
 
-      if (isInPast(date, startTime)) {
+      // when editing, an unchanged start (e.g. a booking already in progress) is not "in the past"
+      const orig0 = editId ? bookings.find(b => b && b.id === editId) : null;
+      const startUnchanged = !!orig0 && orig0.date === date && orig0.startTime === startTime;
+      if (isInPast(date, startTime) && !startUnchanged) {
         showAlert('error', 'Date/Time in the Past', 'You cannot book an instrument in the past. Choose a current or future time.');
         return;
       }
@@ -1123,7 +1199,16 @@
         // fetch the latest state first so the check below sees other people's bookings
         if (CLOUD_ENABLED) await pullCloudData();
 
-        const conflict = checkConflict(inst, date, startTime, endTime);
+        // when editing, make sure the booking still exists and we may still change it
+        const orig = editId ? bookings.find(b => b && b.id === editId) : null;
+        if (editId && (!orig || !canManage(orig) || isEnded(orig))) {
+          closeBookingModal();
+          refreshUI();
+          showAlert('error', 'Cannot Edit', 'This booking no longer exists, has already ended, or you are not allowed to edit it.');
+          return;
+        }
+
+        const conflict = checkConflict(inst, date, startTime, endTime, editId);
         if (conflict) {
           showAlert(
             'error', 
@@ -1133,18 +1218,20 @@
           return;
         }
 
-        const newBooking = {
-          id: Date.now().toString() + '_' + Math.random().toString(36).slice(2, 7),
-          instrument: inst,
-          user: user,
-          date: date,
-          startTime: startTime,
-          endTime: endTime,
-          notes: notes
-        };
+        const newBooking = orig
+          ? { ...orig, instrument: inst, date: date, startTime: startTime, endTime: endTime, notes: notes }
+          : {
+              id: Date.now().toString() + '_' + Math.random().toString(36).slice(2, 7),
+              instrument: inst,
+              user: user,
+              date: date,
+              startTime: startTime,
+              endTime: endTime,
+              notes: notes
+            };
 
         if (CLOUD_ENABLED) {
-          const res = await cloudCreateBooking(newBooking);
+          const res = orig ? await cloudUpdateBooking(orig, newBooking) : await cloudCreateBooking(newBooking);
           if (res === 'conflict') {
             // someone booked the same slot in the last few milliseconds
             await pullCloudData();
@@ -1157,25 +1244,33 @@
           }
         }
 
-        bookings.push(newBooking);
+        if (orig) {
+          bookings = bookings.map(b => (b && b.id === orig.id) ? newBooking : b);
+        } else {
+          bookings.push(newBooking);
+        }
         persistLocal();
 
         closeBookingModal();
         refreshUI();
-        showAlert('success', 'Booking Confirmed', `Booked ${inst} for ${date}.`);
+        if (orig) {
+          showAlert('success', 'Booking Updated', `${inst} on ${date}, ${startTime} - ${endTime}.`);
+        } else {
+          showAlert('success', 'Booking Confirmed', `Booked ${inst} for ${date}.`);
+        }
       } finally {
         savingBooking = false;
         btn.disabled = false;
-        btn.textContent = 'Confirm Booking';
+        btn.textContent = editId ? 'Save Changes' : 'Confirm Booking';
       }
     }
 
-    function checkConflict(instrument, date, start, end) {
+    function checkConflict(instrument, date, start, end, excludeId = null) {
       const newStartMins = toMin(start);
       const newEndMins = toMin(end);
 
       return bookings.find(b => {
-        if (!b || b.instrument !== instrument || b.date !== date || !b.startTime || !b.endTime) return false;
+        if (!b || (excludeId && b.id === excludeId) || b.instrument !== instrument || b.date !== date || !b.startTime || !b.endTime) return false;
         return overlaps(newStartMins, newEndMins, toMin(b.startTime), toMin(b.endTime));
       });
     }
@@ -1208,15 +1303,15 @@
       tbody.innerHTML = '';
 
       const filtered = bookings.filter(b => 
-        b && (
+        b && b.startTime && b.endTime && !isEnded(b) && (
           (b.user && b.user.toLowerCase().includes(search)) || 
           (b.date && b.date.includes(search)) || 
           (b.instrument && b.instrument.toLowerCase().includes(search))
         )
-      ).sort((a,b) => new Date((b.date||'') + 'T' + (b.startTime||'00:00')) - new Date((a.date||'') + 'T' + (a.startTime||'00:00')));
+      ).sort((a,b) => new Date((a.date||'') + 'T' + (a.startTime||'00:00')) - new Date((b.date||'') + 'T' + (b.startTime||'00:00')));
 
       if (filtered.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="6" class="p-6 text-center text-slate-400 text-xs">No active bookings found.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="6" class="p-6 text-center text-slate-400 text-xs">No upcoming bookings found.</td></tr>`;
         return;
       }
 
@@ -1383,11 +1478,20 @@
 
       const datasets = usersList.map((user, index) => {
         const color = USER_COLORS[index % USER_COLORS.length];
-        const dataPoints = sortedTimeBuckets.map(bucket => timeBucketStatsMap[bucket][user] || 0);
+        // cumulative total: each point = hours of all previous periods + this one
+        let running = 0;
+        const periodHours = [];
+        const dataPoints = sortedTimeBuckets.map(bucket => {
+          const h = timeBucketStatsMap[bucket][user] || 0;
+          periodHours.push(h);
+          running += h;
+          return running;
+        });
 
         return {
           label: user.split('@')[0],
           data: dataPoints,
+          periodHours: periodHours,
           borderColor: color,
           backgroundColor: color,
           borderWidth: 3,
@@ -1416,13 +1520,16 @@
             legend: { position: 'bottom' },
             tooltip: {
               callbacks: {
-                label: (context) => `${context.dataset.label}: ${context.raw} hrs`
+                label: (context) => {
+                  const inc = context.dataset.periodHours[context.dataIndex];
+                  return `${context.dataset.label}: ${context.raw} hrs total` + (inc ? ` (+${inc} hrs in this period)` : '');
+                }
               }
             }
           },
           scales: {
             x: { title: { display: true, text: axisTitle } },
-            y: { title: { display: true, text: 'Total Booked Hours' }, beginAtZero: true }
+            y: { title: { display: true, text: 'Cumulative Booked Hours' }, beginAtZero: true }
           }
         }
       });
