@@ -406,7 +406,8 @@
     //   "https://my-lab-default-rtdb.europe-west1.firebasedatabase.app"
     // (no trailing slash). If left empty the app runs in LOCAL MODE:
     // every browser keeps its own data and bookings are NOT shared.
-    const FIREBASE_URL = "https://strumenti-lab-default-rtdb.europe-west1.firebasedatabase.app";
+    const FIREBASE_URL = "https://strumenti-lab-default-rtdb.europe-west1.firebasedatabase.app
+";
 
     // Logo shown in the header, left of "Instrument Booking".
     // Use a file next to this page (e.g. "logo.png") or a full https:// URL.
@@ -676,6 +677,11 @@
     // -------------------------------------------------------------
     document.addEventListener("DOMContentLoaded", () => {
       if (LOGO_URL) {
+        // same image as browser-tab icon (favicon)
+        const fav = document.createElement('link');
+        fav.rel = 'icon';
+        fav.href = LOGO_URL;
+        document.head.appendChild(fav);
         const logo = document.getElementById('headerLogo');
         logo.onload = () => {
           logo.classList.remove('hidden');
