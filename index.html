@@ -51,51 +51,12 @@
         </div>
 
         <div id="userInfoHeader" class="hidden items-center gap-3">
-          <!-- User Color Picker & Hex Input Trigger -->
-          <div class="relative">
-            <button id="headerColorBtn" type="button" onclick="toggleHeaderColorPopover(event)"
-                    class="flex items-center gap-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 px-2.5 py-1.5 rounded-lg text-xs font-medium border border-slate-700 transition"
-                    title="Choose your calendar colour (picker or hex code)">
-              <span id="headerColorSwatch" class="w-3.5 h-3.5 rounded-full border border-white/40 inline-block"></span>
-              <span id="headerColorHexLabel" class="font-mono text-[11px] hidden sm:inline">#2563EB</span>
-              <i data-lucide="palette" class="w-3.5 h-3.5 text-slate-400"></i>
-            </button>
-
-            <!-- Color Picker + Hex Code Popover -->
-            <div id="headerColorPopover" onclick="event.stopPropagation()"
-                 class="hidden absolute right-0 mt-2 w-72 bg-white text-slate-800 rounded-xl shadow-2xl border border-slate-200 p-4 z-50 space-y-3">
-              <div class="flex items-center justify-between">
-                <span class="text-xs font-bold uppercase tracking-wider text-slate-600">Your Calendar Colour</span>
-                <button type="button" onclick="closeHeaderColorPopover()" class="text-slate-400 hover:text-slate-700">
-                  <i data-lucide="x" class="w-4 h-4"></i>
-                </button>
-              </div>
-
-              <div class="flex items-center gap-2">
-                <input type="color" id="myColorPicker"
-                       class="w-10 h-9 rounded-lg border border-slate-300 cursor-pointer p-0.5 bg-white shrink-0"
-                       title="Pick a colour">
-                <input type="text" id="myColorHexInput" maxlength="7" placeholder="#2563EB"
-                       class="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg font-mono text-sm uppercase focus:ring-2 focus:ring-blue-500 outline-none"
-                       title="Enter hex code (e.g. #2563EB)">
-                <button type="button" onclick="applyHeaderHexInput()"
-                        class="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-lg shrink-0 transition">
-                  Apply
-                </button>
-              </div>
-
-              <p id="myColorHexError" class="hidden text-[11px] text-red-600 font-medium">Enter a valid hex code (e.g. #2563EB).</p>
-
-              <div>
-                <span class="block text-[10px] font-semibold uppercase tracking-wider text-slate-400 mb-1.5">Quick Presets</span>
-                <div id="headerColorPresets" class="flex flex-wrap gap-1.5"></div>
-              </div>
+          <div class="flex items-center gap-2 text-right">
+            <span id="userHeaderColorDot" class="w-3 h-3 rounded-full border border-white/40 inline-block shrink-0" title="Your assigned calendar colour"></span>
+            <div>
+              <span id="userEmailDisplay" class="text-sm font-medium block text-slate-200"></span>
+              <span id="userRoleBadge" class="text-[10px] uppercase font-bold text-blue-400 bg-blue-950/60 px-2 py-0.5 rounded border border-blue-800">User</span>
             </div>
-          </div>
-
-          <div class="text-right">
-            <span id="userEmailDisplay" class="text-sm font-medium block text-slate-200"></span>
-            <span id="userRoleBadge" class="text-[10px] uppercase font-bold text-blue-400 bg-blue-950/60 px-2 py-0.5 rounded border border-blue-800">User</span>
           </div>
           <button id="adminPanelBtn" onclick="openAdminModal()" class="hidden bg-slate-800 hover:bg-slate-700 text-amber-400 px-3 py-1.5 rounded-lg text-xs font-medium border border-amber-500/30 transition flex items-center gap-1.5">
             <i data-lucide="shield-check" class="w-4 h-4"></i> Manage Users
@@ -422,14 +383,19 @@
       </div>
 
       <div class="p-6 space-y-6">
-        <form onsubmit="addAuthorizedEmail(event)" class="flex gap-2">
-          <input type="email" id="newAuthEmail" required placeholder="new.researcher@phd.unipi.it" class="flex-1 px-3 py-2 border rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500">
-          <button type="submit" class="bg-emerald-600 hover:bg-emerald-700 text-white font-medium px-4 py-2 rounded-lg text-sm transition">Authorize Email</button>
+        <form onsubmit="addAuthorizedEmail(event)" class="flex flex-wrap sm:flex-nowrap gap-2 items-center">
+          <input type="email" id="newAuthEmail" required placeholder="new.researcher@phd.unipi.it" class="flex-1 min-w-[200px] px-3 py-2 border rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500">
+          <div class="flex items-center gap-1 bg-slate-50 px-2 py-1 rounded-lg border border-slate-200" title="Initial calendar colour for this user">
+            <input type="color" id="newAuthColorPicker" value="#2563EB" class="w-6 h-6 rounded cursor-pointer border-0 bg-transparent p-0">
+            <input type="text" id="newAuthColorHex" value="#2563EB" maxlength="7" placeholder="#2563EB"
+                   class="w-20 px-1.5 py-0.5 border border-slate-200 rounded bg-white font-mono text-xs uppercase outline-none focus:ring-1 focus:ring-blue-500">
+          </div>
+          <button type="submit" class="bg-emerald-600 hover:bg-emerald-700 text-white font-medium px-4 py-2 rounded-lg text-sm transition whitespace-nowrap">Authorize Email</button>
         </form>
 
         <div>
           <h4 class="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Authorized Email List & Calendar Colours</h4>
-          <p class="text-[11px] text-slate-400 mb-2"><strong>Pending</strong>: authorized, no account yet. <strong>Not authorized</strong>: has an account but is not on the list, cannot sign in. Use the colour box or hex field to set each user's calendar colour.</p>
+          <p class="text-[11px] text-slate-400 mb-2"><strong>Pending</strong>: authorized, no account yet. <strong>Not authorized</strong>: has an account but is not on the list, cannot sign in. Only the administrator can set or change each user's calendar colour (via colour picker or #HEX code).</p>
           <div class="max-h-64 overflow-y-auto border border-slate-100 rounded-xl divide-y" id="authorizedListContainer"></div>
         </div>
       </div>
@@ -547,7 +513,7 @@
     }
 
     // -------------------------------------------------------------
-    // USER COLOURS & HEX UTILITIES
+    // USER COLOURS & HEX UTILITIES (ADMIN-CONTROLLED ONLY)
     // -------------------------------------------------------------
     let userColors = getStorageItem('lab_user_colors', {});
     if (typeof userColors !== 'object' || userColors === null) userColors = {};
@@ -598,7 +564,9 @@
       return `rgb(${r}, ${g}, ${b})`;
     }
 
+    // Only the administrator is allowed to set or change a user's calendar colour
     async function setUserColor(email, rawHex, persistCloud = true) {
+      if (!adminOnly()) return false;
       const norm = normalizeHex(rawHex);
       if (!norm || !email) return false;
       const lower = email.toLowerCase().trim();
@@ -607,7 +575,7 @@
         localStorage.setItem('lab_user_colors', JSON.stringify(userColors));
       } catch (e) {}
 
-      updateHeaderColorDisplay();
+      updateHeaderUserColorDot();
       refreshUI();
 
       if (persistCloud && CLOUD_ENABLED) {
@@ -619,130 +587,43 @@
       return true;
     }
 
-    function updateHeaderColorDisplay() {
-      if (!currentUser || !currentUser.email) return;
-      const hex = getUserColor(currentUser.email);
-      const swatch = document.getElementById('headerColorSwatch');
-      const label = document.getElementById('headerColorHexLabel');
-      const picker = document.getElementById('myColorPicker');
-      const hexInput = document.getElementById('myColorHexInput');
-      if (swatch) swatch.style.backgroundColor = hex;
-      if (label) label.textContent = hex;
-      if (picker && picker.value.toUpperCase() !== hex) picker.value = hex;
-      if (hexInput && document.activeElement !== hexInput) hexInput.value = hex;
+    function updateHeaderUserColorDot() {
+      const dot = document.getElementById('userHeaderColorDot');
+      if (!dot || !currentUser || !currentUser.email) return;
+      dot.style.backgroundColor = getUserColor(currentUser.email);
     }
 
-    function toggleHeaderColorPopover(ev) {
-      if (ev) ev.stopPropagation();
-      const pop = document.getElementById('headerColorPopover');
-      if (!pop) return;
-      const isHidden = pop.classList.contains('hidden');
-      if (isHidden) {
-        updateHeaderColorDisplay();
-        const err = document.getElementById('myColorHexError');
-        if (err) err.classList.add('hidden');
-        pop.classList.remove('hidden');
-        safeCreateIcons();
-      } else {
-        pop.classList.add('hidden');
-      }
-    }
+    function initNewAuthColorControls() {
+      const picker = document.getElementById('newAuthColorPicker');
+      const hexInput = document.getElementById('newAuthColorHex');
+      if (!picker || !hexInput) return;
 
-    function closeHeaderColorPopover() {
-      const pop = document.getElementById('headerColorPopover');
-      if (pop) pop.classList.add('hidden');
-    }
-
-    function applyHeaderHexInput() {
-      if (!currentUser || !currentUser.email) return;
-      const hexInput = document.getElementById('myColorHexInput');
-      const err = document.getElementById('myColorHexError');
-      const norm = normalizeHex(hexInput.value);
-      if (!norm) {
-        if (err) err.classList.remove('hidden');
-        hexInput.classList.add('border-red-500');
-        return;
-      }
-      if (err) err.classList.add('hidden');
-      hexInput.classList.remove('border-red-500');
-      hexInput.value = norm;
-      setUserColor(currentUser.email, norm, true);
-      showAlert('success', 'Colour Updated', `Your calendar colour is now <strong>${norm}</strong>.`);
-    }
-
-    function initHeaderColorControls() {
-      const picker = document.getElementById('myColorPicker');
-      const hexInput = document.getElementById('myColorHexInput');
-      const presetsContainer = document.getElementById('headerColorPresets');
-
-      if (presetsContainer) {
-        presetsContainer.innerHTML = USER_COLORS.map(c => `
-          <button type="button" data-preset="${c}"
-                  class="w-6 h-6 rounded-full border border-black/15 hover:scale-110 transition-transform"
-                  style="background-color:${c}" title="${c}"></button>
-        `).join('');
-        presetsContainer.onclick = (e) => {
-          const btn = e.target.closest('[data-preset]');
-          if (!btn || !currentUser || !currentUser.email) return;
-          const hex = btn.dataset.preset;
-          const err = document.getElementById('myColorHexError');
-          if (err) err.classList.add('hidden');
-          if (hexInput) {
-            hexInput.classList.remove('border-red-500');
-            hexInput.value = hex;
-          }
-          setUserColor(currentUser.email, hex, true);
-        };
-      }
-
-      if (picker) {
-        picker.oninput = (e) => {
-          if (!currentUser || !currentUser.email) return;
-          const norm = normalizeHex(e.target.value);
-          if (norm) {
-            if (hexInput) {
-              hexInput.value = norm;
-              hexInput.classList.remove('border-red-500');
-            }
-            const err = document.getElementById('myColorHexError');
-            if (err) err.classList.add('hidden');
-            setUserColor(currentUser.email, norm, false);
-          }
-        };
-        picker.onchange = (e) => {
-          if (!currentUser || !currentUser.email) return;
-          setUserColor(currentUser.email, e.target.value, true);
-        };
-      }
-
-      if (hexInput) {
-        hexInput.oninput = (e) => {
-          const norm = normalizeHex(e.target.value);
-          const err = document.getElementById('myColorHexError');
-          if (norm) {
-            hexInput.classList.remove('border-red-500');
-            if (err) err.classList.add('hidden');
-            if (picker) picker.value = norm;
-            if (currentUser && currentUser.email) {
-              setUserColor(currentUser.email, norm, false);
-            }
-          }
-        };
-        hexInput.onkeydown = (e) => {
-          if (e.key === 'Enter') {
-            e.preventDefault();
-            applyHeaderHexInput();
-          }
-        };
-      }
-
-      document.addEventListener('click', (e) => {
-        const pop = document.getElementById('headerColorPopover');
-        const btn = document.getElementById('headerColorBtn');
-        if (pop && !pop.classList.contains('hidden') && !pop.contains(e.target) && (!btn || !btn.contains(e.target))) {
-          pop.classList.add('hidden');
+      picker.oninput = (e) => {
+        const norm = normalizeHex(e.target.value);
+        if (norm) {
+          hexInput.value = norm;
+          hexInput.classList.remove('border-red-500');
         }
-      });
+      };
+
+      hexInput.oninput = (e) => {
+        const norm = normalizeHex(e.target.value);
+        if (norm) {
+          hexInput.classList.remove('border-red-500');
+          picker.value = norm;
+        }
+      };
+
+      hexInput.onchange = (e) => {
+        const norm = normalizeHex(e.target.value);
+        if (!norm) {
+          hexInput.classList.add('border-red-500');
+        } else {
+          hexInput.value = norm;
+          hexInput.classList.remove('border-red-500');
+          picker.value = norm;
+        }
+      };
     }
 
     // -------------------------------------------------------------
@@ -894,7 +775,7 @@
           showAlert('error', 'Access Revoked', 'Your email is no longer authorized. Please contact the administrator.');
           return;
         }
-        updateHeaderColorDisplay();
+        updateHeaderUserColorDot();
         refreshUI();
       } catch (e) {
         setCloudStatus('error');
@@ -962,7 +843,7 @@
         };
         logo.src = effectiveLogo; // if the image fails to load, the flask icon stays
       }
-      initHeaderColorControls();
+      initNewAuthColorControls();
       safeCreateIcons();
       // keep the Peltier checkbox in sync with the booking form
       ['modalInstrument', 'modalDate', 'modalStartTime', 'modalEndTime'].forEach(id => {
@@ -1038,7 +919,7 @@
           userInfoHeader.classList.add('flex');
 
           document.getElementById('userEmailDisplay').textContent = currentUser.email;
-          updateHeaderColorDisplay();
+          updateHeaderUserColorDot();
 
           if (currentUser.email.toLowerCase() === ADMIN_EMAIL.toLowerCase()) {
             adminPanelBtn.classList.remove('hidden');
@@ -1053,7 +934,6 @@
           authSection.classList.remove('hidden');
           appDashboard.classList.add('hidden');
           userInfoHeader.classList.add('hidden');
-          closeHeaderColorPopover();
         }
       } catch (e) {}
     }
@@ -1137,7 +1017,10 @@
 
       if (CLOUD_ENABLED) {
         // the "authorized" entry first: the database rules only accept a new password for an authorized email
-        const r2 = await cloudWrite('PUT', `lab/authorized/${emailKey(email)}`, { status: 'Registered' });
+        // preserve any colour already assigned by the administrator
+        const assignedColor = normalizeHex(userColors[email]);
+        const authPayload = assignedColor ? { status: 'Registered', color: assignedColor } : { status: 'Registered' };
+        const r2 = await cloudWrite('PUT', `lab/authorized/${emailKey(email)}`, authPayload);
         const r1 = r2 === 'ok' ? await cloudWrite('PUT', `lab/passes/${emailKey(email)}`, pass) : r2;
         if (r1 === 'denied' && r2 === 'ok') {
           await pullCloudData();
@@ -1247,7 +1130,7 @@
         container.appendChild(div);
       });
 
-      // Delegated handlers for actions & color inputs
+      // Delegated handlers for actions & color inputs (admin only)
       container.onclick = (ev) => {
         const b = ev.target.closest('[data-act]');
         if (!b) return;
@@ -1315,24 +1198,28 @@
       return true;
     }
 
-    async function authorizeEmail(email) {
+    async function authorizeEmail(email, initialHex = null) {
       if (!adminOnly()) return;
       email = email.trim().toLowerCase();
       const status = isUserRegistered(email) ? 'Registered' : 'Pending';
+      const chosenHex = normalizeHex(initialHex) || normalizeHex(userColors[email]) || getDefaultUserColor(email);
 
       if (CLOUD_ENABLED) {
-        const r = await cloudWrite('PUT', `lab/authorized/${emailKey(email)}`, { status });
+        const r = await cloudWrite('PUT', `lab/authorized/${emailKey(email)}`, { status, color: chosenHex });
         if (r !== 'ok') {
           showAlert('error', 'Server Error', 'Could not save on the server. Please try again.<br><span class="text-xs opacity-70">' + esc(lastCloudError) + '</span>');
           return false;
         }
+        cloudWriteSilent('PUT', `lab/colors/${emailKey(email)}`, chosenHex);
       }
+      userColors[email] = chosenHex;
       if (!authorizedUsers.some(u => u && u.email && u.email.toLowerCase() === email)) {
         authorizedUsers.push({ email: email, status: status });
       }
       persistLocal();
       renderAuthorizedUsersList();
-      showAlert('success', 'Email Authorized', `${esc(email)} can now register and sign in.`);
+      refreshUI();
+      showAlert('success', 'Email Authorized', `${esc(email)} can now register and sign in (colour: <strong>${chosenHex}</strong>).`);
       return true;
     }
 
@@ -1341,11 +1228,24 @@
       const email = document.getElementById('newAuthEmail').value.trim().toLowerCase();
       if (!email) return;
 
+      const hexInput = document.getElementById('newAuthColorHex');
+      const pickerInput = document.getElementById('newAuthColorPicker');
+      const rawHex = hexInput ? hexInput.value : (pickerInput ? pickerInput.value : null);
+      const normHex = normalizeHex(rawHex);
+      if (!normHex) {
+        if (hexInput) hexInput.classList.add('border-red-500');
+        showAlert('error', 'Invalid Hex Colour', 'Please enter a valid 6-digit hex colour code (e.g. #2563EB).');
+        return;
+      }
+      if (hexInput) hexInput.classList.remove('border-red-500');
+
       if (authorizedUsers.some(u => u && u.email && u.email.toLowerCase() === email)) {
         showAlert('warning', 'Email Already Exists', 'Email is already authorized.');
         return;
       }
-      if (await authorizeEmail(email)) document.getElementById('newAuthEmail').value = '';
+      if (await authorizeEmail(email, normHex)) {
+        document.getElementById('newAuthEmail').value = '';
+      }
     }
 
     // Revokes access AND deletes the account (password). Bookings already made are kept.
@@ -1447,9 +1347,8 @@
       if (!bar) return;
 
       const me = currentUser && currentUser.email ? currentUser.email.toLowerCase() : '';
-      const myHex = me ? getUserColor(me) : USER_COLORS[0];
 
-      // Collect unique users from bookings + current user
+      // Read-only legend showing each user's assigned colour (set exclusively by the admin)
       const seenUsers = new Set();
       if (me) seenUsers.add(me);
       bookings.forEach(b => {
@@ -1469,14 +1368,6 @@
       }).join('');
 
       bar.innerHTML = `
-        ${me ? `
-          <button type="button" onclick="toggleHeaderColorPopover(event)"
-                  class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full border border-slate-300 bg-slate-50 hover:bg-slate-100 text-slate-700 font-semibold transition"
-                  title="Click to pick a colour or enter a hex code">
-            <span class="w-2.5 h-2.5 rounded-full inline-block" style="background-color:${myHex}"></span>
-            <span>Your colour: <span class="font-mono">${myHex}</span> (Change)</span>
-          </button>
-        ` : ''}
         ${userChips}
         <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded bg-slate-200 border border-slate-300 inline-block"></span> Past</span>
         <span class="flex items-center gap-1.5"><span class="px-1 rounded bg-white border border-slate-300 text-[9px] font-bold">P</span> Peltier apparatus requested</span>
