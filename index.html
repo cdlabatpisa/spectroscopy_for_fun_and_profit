@@ -761,7 +761,7 @@
             cloudColors[keyEmail(k)] = normalizeHex(v);
           }
         });
-        userColors = { ...userColors, ...cloudColors };
+        userColors = cloudColors;
 
         ensureAdminDefaults();
         persistLocal();
@@ -1264,8 +1264,12 @@
           return;
         }
       }
+      if (CLOUD_ENABLED) {
+        cloudWriteSilent('DELETE', `lab/colors/${emailKey(email)}`);
+      }
       authorizedUsers = authorizedUsers.filter(u => u && u.email && u.email.toLowerCase() !== email);
       delete registeredPasses[email];
+      delete userColors[email];
       persistLocal();
       renderAuthorizedUsersList();
       showAlert('info', 'User Removed', `${esc(email)} has been removed.`);
@@ -1346,29 +1350,7 @@
       const bar = document.getElementById('calendarLegendBar');
       if (!bar) return;
 
-      const me = currentUser && currentUser.email ? currentUser.email.toLowerCase() : '';
-
-      // Read-only legend showing each user's assigned colour (set exclusively by the admin)
-      const seenUsers = new Set();
-      if (me) seenUsers.add(me);
-      bookings.forEach(b => {
-        if (b && b.user) seenUsers.add(b.user.toLowerCase());
-      });
-
-      const userChips = Array.from(seenUsers).map(email => {
-        const hex = getUserColor(email);
-        const label = email.split('@')[0];
-        const isMe = email === me;
-        return `
-          <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full border text-[11px]"
-                style="background-color:${hexToRgba(hex, 0.14)}; border-color:${hexToRgba(hex, 0.5)}; color:${getContrastTextColor(hex)}">
-            <span class="w-2.5 h-2.5 rounded-full inline-block" style="background-color:${hex}"></span>
-            <span>${esc(label)}${isMe ? ' (you)' : ''}</span>
-          </span>`;
-      }).join('');
-
       bar.innerHTML = `
-        ${userChips}
         <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded bg-slate-200 border border-slate-300 inline-block"></span> Past</span>
         <span class="flex items-center gap-1.5"><span class="px-1 rounded bg-white border border-slate-300 text-[9px] font-bold">P</span> Peltier apparatus requested</span>
         <span class="text-slate-400">Click an empty slot to book, click a booking to edit it.</span>
